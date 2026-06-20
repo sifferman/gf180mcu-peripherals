@@ -49,3 +49,10 @@ Each item has the decision I made so work could continue — change any of them 
   CSR-readable + a few status LEDs to save pads; say if you want the full 16-LED bank.
 - **A4.** If full-chip GDS won't close in the time available, which subset is most important to you to
   have hardened first? (My default priority: Ethernet+SDRAM > SD > PLL.)
+
+## Tooling note (autonomous session)
+
+- `gh` CLI is **not authenticated** in this environment and the SSH push works, so:
+  the `peripherals-mvp` branch is pushed (CI triggers on push to any branch), but I
+  **could not open the PR or read CI results**. Please open the PR from the branch and
+  check Actions. I'm using local `librelane`/`make sim` runs as the CI proxy.

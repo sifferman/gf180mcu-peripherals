@@ -93,10 +93,17 @@ module chip_top #(
         (* keep *)
         `gf180mcu_xxx_io__dvdd pad (
             `ifdef USE_POWER_PINS
+            `ifdef PAD_gf180mcu_fd_io
+            // fd_io dvdd cell has no VDD port (core/IO domains shorted: VDD=DVDD)
+            .DVDD   (DVDD),
+            .DVSS   (DVSS),
+            .VSS    (VSS)
+            `else
             .DVDD   (DVDD),
             .DVSS   (DVSS),
             .VDD    (VDD),
             .VSS    (VSS)
+            `endif
             `endif
         );
     end
@@ -104,10 +111,17 @@ module chip_top #(
         (* keep *)
         `gf180mcu_xxx_io__dvss pad (
             `ifdef USE_POWER_PINS
+            `ifdef PAD_gf180mcu_fd_io
+            // fd_io dvss cell has no VSS port (core/IO domains shorted: VSS=DVSS)
+            .DVDD   (DVDD),
+            .DVSS   (DVSS),
+            .VDD    (VDD)
+            `else
             .DVDD   (DVDD),
             .DVSS   (DVSS),
             .VDD    (VDD),
             .VSS    (VSS)
+            `endif
             `endif
         );
     end
@@ -115,10 +129,17 @@ module chip_top #(
         (* keep *)
         `gf180mcu_xxx_io__vdd pad (
             `ifdef USE_POWER_PINS
+            `ifdef PAD_gf180mcu_fd_io
+            // fd_io maps vdd->dvdd cell (no VDD port; VDD=DVDD)
+            .DVDD   (DVDD),
+            .DVSS   (DVSS),
+            .VSS    (VSS)
+            `else
             .DVDD   (DVDD),
             .DVSS   (DVSS),
             .VDD    (VDD),
             .VSS    (VSS)
+            `endif
             `endif
         );
     end
@@ -126,10 +147,17 @@ module chip_top #(
         (* keep *)
         `gf180mcu_xxx_io__vss pad (
             `ifdef USE_POWER_PINS
+            `ifdef PAD_gf180mcu_fd_io
+            // fd_io maps vss->dvss cell (no VSS port; VSS=DVSS)
+            .DVDD   (DVDD),
+            .DVSS   (DVSS),
+            .VDD    (VDD)
+            `else
             .DVDD   (DVDD),
             .DVSS   (DVSS),
             .VDD    (VDD),
             .VSS    (VSS)
+            `endif
             `endif
         );
     end

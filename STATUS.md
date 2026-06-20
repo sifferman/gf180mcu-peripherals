@@ -23,3 +23,9 @@ Living tracker. See `questions.md` for decisions/risks and
 - M1 DONE: chip_core gold path (eth UDP->axil_ram) passes `make sim` (ARP+UDP write/read-back
   over RMII) via vendored cocotb/_eth (no pip deps). SRAM macros removed from RTL+macros+pdn
   (guarded). Pure-struct testbench + tb_top.sv wrapper (works for RTL & GL).
+
+- M1 hardening: power-pad fix (fd_io 3-pin) + package inlining cleared Verilator lint and
+  yosys parse; full synth in progress locally. Pushed to origin/peripherals-mvp.
+- M2 WIP (parked, not integrated): open behavioral SDRAM model cocotb/models/sdram_sim.v +
+  standalone tb; AXI write/read-back currently times out (controller init/handshake — TBD).
+  Per project note, SDRAM functional sim is a 'later' item (authoritative = encrypted .vp on VCS).

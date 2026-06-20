@@ -30,8 +30,7 @@ meta:
 
 DESIGN_NAME: chip_top
 VERILOG_FILES:
-# Ethernet UDP->memory datapath (package first for dependency order)
-- dir::../src/eth/dma_command_pkg.sv
+# Ethernet UDP->memory datapath
 - dir::../src/eth/delay_to_negedge.sv
 - dir::../src/eth/m_axil_readwrite.sv
 - dir::../src/eth/udp_command_memory_bridge.sv

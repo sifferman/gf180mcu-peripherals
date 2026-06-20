@@ -212,8 +212,7 @@ def chip_top_runner():
     else:
         sources.append(PROJ / "../src/chip_top.sv")
         sources.append(PROJ / "../src/chip_core.sv")
-        # Ethernet datapath (package first)
-        sources.append(PROJ / "../src/eth/dma_command_pkg.sv")
+        # Ethernet datapath
         sources.append(PROJ / "../src/eth/delay_to_negedge.sv")
         sources.append(PROJ / "../src/eth/m_axil_readwrite.sv")
         sources.append(PROJ / "../src/eth/udp_command_memory_bridge.sv")

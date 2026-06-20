@@ -9,9 +9,7 @@
 // The rx_udp_*/tx_udp_* and AXI port names are the fixed interface contract with
 // udp_complete / the block design, so they keep canonical names (no _i/_o).
 
-module udp_command_memory_bridge
-    import dma_command_pkg::*;
-#(
+module udp_command_memory_bridge #(
     parameter logic [15:0] UdpPort = 16'd1234
 ) (
     input  wire        clk_i,
@@ -68,6 +66,14 @@ module udp_command_memory_bridge
     input  wire        m_mem_rvalid,
     output wire        m_mem_rready
 );
+    // DMA command protocol constants (was dma_command_pkg; inlined so the design
+    // needs no SystemVerilog package — keeps the default yosys frontend happy).
+    localparam logic [7:0]  DmaMagic       = 8'hA5;
+    localparam logic [7:0]  DmaOpWrite     = 8'h01;
+    localparam logic [7:0]  DmaOpRead      = 8'h02;
+    localparam logic [7:0]  DmaRespFlag    = 8'h80;   // OR'd into the opcode in replies
+    localparam int unsigned DmaHeaderBytes = 10;
+
     // ---- command / reply state ----
     logic [7:0]  opcode_d, opcode_q;
     logic [15:0] cmd_len_d, cmd_len_q;

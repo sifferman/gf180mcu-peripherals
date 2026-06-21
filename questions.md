@@ -3,24 +3,24 @@
 Logged autonomously while you're away. Resolved items have been removed.
 Background/decision record lives in STATUS.md and the plan file.
 
-## Genuine open fork (affects M2 SDRAM pinout)
+## Decided (kept for the record)
 
-- **SDRAM pin strategy.** x16 SDRAM (39 drive pads) + RMII out (4) = 43 > 40 bidir, so the
-  full chip needs ~7 more drive-capable pads than the stock ring's 40. Two ways:
-  - **(default) Retype ~7 input-only pads to bidir** (`NUM_INPUT 12→5`, `NUM_BIDIR 40→47`):
-    keeps full **x16** SDRAM, no controller change, same 74-pad ring/positions/power. Only the
-    pad *cell type* changes at 7 positions (your custom PCB must drive those positions as I/O).
-  - **8-bit SDRAM**: bond DQ[7:0], tie UDQM high → ~30 drive pads, fits 40 without retyping,
-    but halves capacity/bandwidth. ultraembedded controller stays 16-bit, so it'd be a
-    "bond-8-of-16" (software uses the low byte) rather than a true x8.
-  - **I'm proceeding with the retype (full x16)** when I wire SDRAM into the top in M2. It's
-    isolated to the final pad mapping, so M2 logic/sim doesn't depend on this — flip it any time.
+- **SDRAM pins: retype ~7 input-only pads to bidir** (`NUM_INPUT 12→5`, `NUM_BIDIR 40→47`) →
+  full **x16** SDRAM, no controller change, same 74-pad ring/positions/power. (Chosen over the
+  8-bit "bond-8-of-16" alternative.) Applied at the top-level pad mapping in M2.
 
 ## For your PCB (not blocking RTL)
 
-- **LAN8720A PHY strapping.** The design has no MDIO, so the PHY's address/mode (100M full-duplex,
-  auto-neg) is set by board straps. Confirm your PCB straps it as desired.
-- **If you retype input pads to bidir (above), confirm your PCB drives those positions as I/O.**
+- **LAN8720A PHY strapping** (from reference/8720a.pdf §3.7). The design has no MDIO, so the PHY
+  is configured by reset-latched straps on its RMII/LED pins (augment with ~10k external resistors
+  since the pins also carry live signals):
+  - MODE[2:0] = RXD0/RXD1/CRS_DV → **111** "All capable, auto-neg enabled" (pull-ups to VDDIO).
+  - PHYAD0 = RXER → **0** (internal pull-down default; fine, no MDIO).
+  - nINTSEL = LED2 → **1 = REF_CLK In Mode** (we source the 50 MHz clock); tie high to VDD2A.
+  - REGOFF = LED1 → **low** = use internal 1.2 V regulator (unless feeding external 1.2 V to VDDCR).
+  - Clocking: a 50 MHz oscillator drives chip clk_PAD AND the PHY XTAL1/CLKIN (REF_CLK In Mode);
+    no 25 MHz crystal on the PHY.
+- **Retyped input→bidir positions: confirm your custom PCB drives those positions as I/O.**
 
 ## Tooling
 

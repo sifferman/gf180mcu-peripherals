@@ -133,3 +133,14 @@ sim-gl: clone-pdk defines ## Run gate-level simulation with cocotb (after copy-f
 sim-view: ## View simulation waveforms in GTKWave
 	gtkwave cocotb/sim_build/chip_top.fst
 .PHONY: sim-view
+
+sim-sdram: ## Standalone SDRAM controller + open behavioral model test (iverilog, no PDK)
+	mkdir -p cocotb/sim_build
+	iverilog -g2012 -o cocotb/sim_build/tb_sdram \
+		cocotb/models/tb_sdram.v \
+		third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi.v \
+		third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi_core.v \
+		third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi_pmem.v \
+		cocotb/models/sdram_sim.v
+	vvp cocotb/sim_build/tb_sdram
+.PHONY: sim-sdram

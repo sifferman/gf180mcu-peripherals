@@ -2,7 +2,7 @@
 // Standalone self-checking test: ultraembedded sdram_axi + behavioral sdram_sim.
 // Writes two words over AXI4 and reads them back. Pure iverilog (no cocotb):
 //   iverilog -g2012 -o /tmp/tbsdram cocotb/models/tb_sdram.v \
-//       third_party/core_sdram_axi4/src_v/*.v cocotb/models/sdram_sim.v && vvp /tmp/tbsdram
+//       third_party/ultraembedded_axi_sdram_controller/src_v/*.v cocotb/models/sdram_sim.v && vvp /tmp/tbsdram
 
 `default_nettype none
 `timescale 1ns/1ps

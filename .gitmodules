@@ -9,6 +9,6 @@
 [submodule "third_party/wangxuan95_sdcard"]
 	path = third_party/wangxuan95_sdcard
 	url = https://github.com/WangXuan95/FPGA-SDcard-Reader
-[submodule "third_party/core_sdram_axi4"]
-	path = third_party/core_sdram_axi4
+[submodule "third_party/ultraembedded_axi_sdram_controller"]
+	path = third_party/ultraembedded_axi_sdram_controller
 	url = https://github.com/ultraembedded/core_sdram_axi4

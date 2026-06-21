@@ -28,6 +28,11 @@ create_clock {*}$port_args -name $clock_port -period $::env(CLOCK_PERIOD)
 
 set input_delay_value [expr $::env(CLOCK_PERIOD) * $::env(IO_DELAY_CONSTRAINT) / 100]
 set output_delay_value [expr $::env(CLOCK_PERIOD) * $::env(IO_DELAY_CONSTRAINT) / 100]
+# Minimum (earliest) input arrival. A real source-synchronous driver (e.g. the
+# LAN8720A RMII RX) holds its data for several ns after the clock edge, so the
+# default -min of 0 (data racing the clock edge) creates spurious input-port hold
+# violations at the first capture flop. Model ~10% of the period of input hold.
+set input_delay_min_value [expr $::env(CLOCK_PERIOD) * 0.10]
 puts "\[INFO] Setting output delay to: $output_delay_value"
 puts "\[INFO] Setting input delay to: $input_delay_value"
 
@@ -46,7 +51,7 @@ set clk_core_inout_ports [get_ports {
     bidir_PAD[*]
 }] 
 
-set_input_delay -min 0 -clock $clocks $clk_core_inout_ports
+set_input_delay -min $input_delay_min_value -clock $clocks $clk_core_inout_ports
 set_input_delay -max $input_delay_value -clock $clocks $clk_core_inout_ports
 set_output_delay $output_delay_value -clock $clocks $clk_core_inout_ports
 
@@ -56,7 +61,7 @@ set clk_core_input_ports [get_ports {
     input_PAD[*]
 }] 
 
-set_input_delay -min 0 -clock $clocks $clk_core_input_ports
+set_input_delay -min $input_delay_min_value -clock $clocks $clk_core_input_ports
 set_input_delay -max $input_delay_value -clock $clocks $clk_core_input_ports
 
 # Output load

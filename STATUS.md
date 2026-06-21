@@ -72,3 +72,14 @@ Living tracker. See `questions.md` for decisions/risks and
   AFTER M1 hardening completes (keep the tree consistent with the running build).
 - M1 (Ethernet) hardening: cleared synthesis+checks, **floorplan fits**, now in placement
   prep (padring/macro placement/tap-endcap). PnR/CTS/routing/DRC/LVS to follow.
+
+## FIRST GDS achieved (M1 Ethernet) + sign-off fixes
+
+- Full flow ran end-to-end and **streamed out chip_top.gds (301 MB, LVS-clean, setup-clean,
+  routing-DRC clean)** — run RUN_2026-06-20_23-14-11/final/. Cell area 5.5M um2.
+- Two deferred sign-off errors, both addressed:
+  - Hold: the only 3 violations were INPUT PORTS (RMII RX), caused by SDC `set_input_delay -min 0`
+    (data racing the clock edge). Set -min = 10% of period (real RMII RX holds data several ns).
+  - Density: M2.4 (Metal2 >30% coverage, die-wide) — the known gf180 case handled by dummy fill
+    in the wafer.space precheck; disabled the in-flow KLayout density check (template-intended).
+- Re-running for a clean sign-off (LVS + hold + DRC all clear).

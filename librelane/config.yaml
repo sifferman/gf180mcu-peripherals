@@ -15,9 +15,10 @@ meta:
     #KLayout.Antenna: null
     #Checker.KLayoutAntenna: null
 
-    # Disable KLayout density check
-    #KLayout.Density: null
-    #Checker.KLayoutDensity: null
+    # Disable KLayout density check (Metal2 >30% coverage is met by dummy fill
+    # added in the wafer.space precheck, not in this flow).
+    KLayout.Density: null
+    Checker.KLayoutDensity: null
 
     # Save time during development
     # Enable for sign-off

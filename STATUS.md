@@ -108,10 +108,14 @@ Living tracker. See `questions.md` for decisions/risks and
   SLANG_ARGUMENTS, so the *true* CRC arp_cache hash elaborates. Submodule fully pristine.
   Verified: RTL sim PASS (real CRC) + full Yosys synthesis clean. The crash is also already
   fixed on yosys-slang *master* (static-select fast-paths) — see questions.md.
-- **GDS re-hardening with real CRC IN PROGRESS** — run RUN_2026-06-21_10-30-49 (the earlier
-  full run RUN_2026-06-21_09-13-01 was OOM-killed at step 31 during a load spike; restarted
-  clean). The committed source now uses real CRC, so final/ must be regenerated from this run
-  before it is tapeout-current.
+- **✅ GDS re-hardening with real CRC COMPLETE — clean sign-off (2026-06-21 13:19).**
+  Run RUN_2026-06-21_10-30-49, "Flow complete." exit 0, ~2h49m. Manufacturability report:
+  **Antenna PASSED ✅ · LVS PASSED ✅ · DRC PASSED ✅** (Magic+KLayout DRC, KLayout antenna,
+  routing DRC all clear; no setup/hold violations). final/gds/chip_top.gds = 304 MB, real CRC
+  ARP hash. (Non-fatal warnings only: Max-Slew/Max-Cap in some corners — timing-quality, not
+  manufacturability; IR-drop skipped, no VSRC_LOC_FILES.) The earlier full run
+  RUN_2026-06-21_09-13-01 was OOM-killed at step 31 during a 3-job load spike; this restart ran
+  clean. This GDS supersedes the XOR-fold M2 GDS with the true CRC — tapeout-current.
 - **M4 digital PLL added** (commit, src/dpll/): binary-weighted mux-chain ring DCO
   (`ring_dco.sv`, structural gf180 cells + dont_touch, behavioural sim model) +
   bang-bang frequency-locked control (`dpll_ctrl.sv`, Gray-CDC edge counter, tune-band lock).

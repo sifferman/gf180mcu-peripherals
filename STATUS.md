@@ -45,13 +45,15 @@ Living tracker. See `questions.md` for decisions/risks and
   in finite time (constexpr `lfsr_mask`, >60s per instance, both LOOP/REDUCTION). Confirmed on
   an unloaded box, so not contention.
 - Switched to the **slang** frontend (USE_SLANG) — elaborates the whole UDP stack in ~20s.
-- Two submodule patches (pushed to sifferman/alexforencich_ethernet@rmii a03ff41):
-  - lfsr.v: force LOOP style under the auto-defined YOSYS macro (yosys ignores the
-    translate_off guard around `define SIMULATION).
-  - arp_cache.v: replace the DATA_WIDTH=32 lfsr hash (crashes pinned yosys-slang) with an
-    XOR-fold hash (cache stores+checks full IP, so only collision rate changes).
-- Full chip_top now elaborates under slang (EXIT 0); RTL `make sim` still PASSES.
-- Next: validate slang synthesis step, then launch full GDS hardening.
+- **(2026-06-21) slang lfsr crash root-caused + fixed cleanly — NO RTL patches, submodule pristine,
+  REAL CRC restored.** The `Assertion 'location' failed` was slang's constexpr step limit: yosys-slang
+  reuses one `EvalContext`, so slang's per-evaluation `steps` counter accumulates design-wide and the
+  two DATA_WIDTH=32 arp_cache CRC lfsr instances push it past the 1,000,000 default (then slang asserts
+  on an empty SourceLocation instead of erroring). Fix: `SLANG_ARGUMENTS += --max-constexpr-steps
+  1000000000`. The earlier two src/patches overrides (lfsr.v LOOP-style + arp_cache.v XOR-fold) are
+  DELETED — the submodule is back to upstream 2a692e4 and the design uses the true CRC ARP hash.
+  Validated: full Yosys synthesis clean (netlist produced, no crash) + RTL `make sim` PASS with real CRC.
+  Upstream fork patches (yosys-slang step accumulation; slang assert-on-empty-loc) tracked in questions.md.
 
 ## Hardening progress (overnight, slang)
 

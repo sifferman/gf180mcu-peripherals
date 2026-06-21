@@ -391,7 +391,11 @@ class RmiiSink(Reset):
                 # align di-bit sampling to the first TX_EN cycle; at 10M each
                 # di-bit is held for cpd cycles, so sample mid-window
                 if not started:
-                    if int(self.dv.value):
+                    # During reset the DUT's TX_EN output is X in gate-level sim
+                    # (std-cell flops are unresolved until reset propagates); treat
+                    # an unresolved TX_EN as idle rather than crashing on int(X).
+                    dv = self.dv.value
+                    if dv.is_resolvable and int(dv):
                         started = True
                         cyc = 0
                     else:

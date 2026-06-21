@@ -44,7 +44,7 @@ VERILOG_FILES:
 - dir::../third_party/alexforencich_ethernet/lib/axis/rtl/axis_fifo.v
 - dir::../third_party/alexforencich_ethernet/lib/axis/rtl/priority_encoder.v
 - dir::../third_party/alexforencich_ethernet/rtl/arp.v
-- dir::../src/patches/alexforencich_ethernet/arp_cache.v
+- dir::../third_party/alexforencich_ethernet/rtl/arp_cache.v
 - dir::../third_party/alexforencich_ethernet/rtl/arp_eth_rx.v
 - dir::../third_party/alexforencich_ethernet/rtl/arp_eth_tx.v
 - dir::../third_party/alexforencich_ethernet/rtl/axis_gmii_rx.v
@@ -60,7 +60,7 @@ VERILOG_FILES:
 - dir::../third_party/alexforencich_ethernet/rtl/ip_complete.v
 - dir::../third_party/alexforencich_ethernet/rtl/ip_eth_rx.v
 - dir::../third_party/alexforencich_ethernet/rtl/ip_eth_tx.v
-- dir::../src/patches/alexforencich_ethernet/lfsr.v
+- dir::../third_party/alexforencich_ethernet/rtl/lfsr.v
 - dir::../third_party/alexforencich_ethernet/rtl/mac_ctrl_rx.v
 - dir::../third_party/alexforencich_ethernet/rtl/mac_ctrl_tx.v
 - dir::../third_party/alexforencich_ethernet/rtl/mac_pause_ctrl_rx.v
@@ -89,14 +89,21 @@ VERILOG_FILES:
 # (constexpr lfsr_mask, >60s PER instance, regardless of LOOP/REDUCTION style),
 # which stalls JsonHeader/Synthesis indefinitely. slang elaborates the whole
 # design in ~20s.
-# One caveat: the pinned yosys-slang asserts ("Assertion 'location' failed") on
-# the DATA_WIDTH=32 `lfsr` — used only by arp_cache's hash — so that hash was
-# replaced with a cheap XOR-fold (see third_party/.../arp_cache.v patch). The
-# 8-bit FCS lfsr instances are fine under slang.
 USE_SLANG: True
-# IO pad / SRAM / wafer-IP cells are physical macros (blackboxes from lib/lef),
-# not in VERILOG_FILES; treat unknown module instances as blackboxes.
-SLANG_ARGUMENTS: ['--ignore-unknown-modules']
+# Two slang options:
+#   --ignore-unknown-modules : IO pad / SRAM / wafer-IP cells are physical macros
+#     (blackboxes from lib/lef), not in VERILOG_FILES; treat unknown instances as
+#     blackboxes.
+#   --max-constexpr-steps    : yosys-slang reuses one slang EvalContext for the whole
+#     design, so slang's per-evaluation `steps` counter ACCUMULATES across every
+#     constexpr (notably verilog-ethernet's CRC `lfsr_mask`, evaluated once per
+#     output bit per instance). With the default 1,000,000 limit the design's two
+#     DATA_WIDTH=32 arp_cache lfsr instances push the running total over the limit,
+#     and slang then crashes (asserts on an empty SourceLocation) instead of erroring
+#     cleanly. Raising the ceiling lets the *real* CRC hash elaborate — no RTL
+#     workaround needed; the submodule stays pristine. (Root-caused in questions.md;
+#     upstream slang/yosys-slang fixes tracked there.)
+SLANG_ARGUMENTS: ['--ignore-unknown-modules', '--max-constexpr-steps', '1000000000']
 # The verilog-ethernet stack trips yosys's synth check with benign warnings that are
 # FPGA-proven and pass RTL sim: ~192 "no driver" on unused PTP timestamp ports
 # (rx/tx_ptp_ts; PTP disabled) and ~86 yosys false-positive "multiple drivers" on the

@@ -52,3 +52,12 @@ Living tracker. See `questions.md` for decisions/risks and
     XOR-fold hash (cache stores+checks full IP, so only collision rate changes).
 - Full chip_top now elaborates under slang (EXIT 0); RTL `make sim` still PASSES.
 - Next: validate slang synthesis step, then launch full GDS hardening.
+
+## Hardening progress (overnight, slang)
+
+- Synthesis now COMPLETES (slang, ~3 min). Cell area **5.5M um2** (was 16.8M) after shrinking
+  TX/RX FIFOs 4096->1024 and ARP cache 512->4 entries — fits the 12.9M um2 1x1 core.
+- Cleared Verilator lint + YosysUnmappedCells. YosysSynthChecks flagged only benign warnings
+  (unused PTP ports; async-FIFO gray2bin yosys false-positive) -> ERROR_ON_SYNTH_CHECKS=false.
+- Full 3v3 GDS hardening (PnR/DRC/LVS) running locally (monitored). M1 Ethernet gold path.
+- Added cocotb/sim_udp_bridge.py + 'make sim-bridge' (drive dma.py against the sim).

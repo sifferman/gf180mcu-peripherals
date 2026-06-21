@@ -54,15 +54,17 @@ module tb_sdram;
         .Ba(s_ba), .Addr(s_addr), .Dqm(s_dqm), .Dq(dq)
     );
 
+    // This controller accepts AW and W on the same cycle (sdram_axi_pmem).
     task axi_write(input [31:0] a, input [31:0] d);
         begin
             @(posedge clk);
             awaddr<=a; awid<=0; awlen<=0; awburst<=2'b01; awvalid<=1;
             wdata<=d; wstrb<=4'hf; wlast<=1; wvalid<=1; bready<=1;
-            // wait for AW + W accept
-            wait (awready); @(posedge clk); awvalid<=0;
-            wait (wready);  @(posedge clk); wvalid<=0;
-            wait (bvalid);  @(posedge clk); bready<=0;
+            @(posedge clk);
+            while (!(awready && wready)) @(posedge clk);  // both accepted together
+            awvalid<=0; wvalid<=0;
+            while (!bvalid) @(posedge clk);               // bready held high -> consumed
+            @(posedge clk); bready<=0;
         end
     endtask
 
@@ -70,8 +72,12 @@ module tb_sdram;
         begin
             @(posedge clk);
             araddr<=a; arid<=0; arlen<=0; arburst<=2'b01; arvalid<=1; rready<=1;
-            wait (arready); @(posedge clk); arvalid<=0;
-            wait (rvalid); d = rdata; @(posedge clk); rready<=0;
+            @(posedge clk);
+            while (!arready) @(posedge clk);
+            arvalid<=0;
+            while (!rvalid) @(posedge clk);
+            d = rdata;
+            @(posedge clk); rready<=0;
         end
     endtask
 
@@ -81,8 +87,9 @@ module tb_sdram;
         repeat (5) @(posedge clk);
         rst <= 0;
 
-        // Wait out the controller's ~100us power-up/init before it accepts AXI.
-        wait (awready);
+        // Let the controller finish its ~100us power-up/init. axi_write holds
+        // awvalid until awready, so issuing now is fine, but settle a bit first.
+        repeat (7000) @(posedge clk);
 
         axi_write(32'h0000_0100, 32'hDEAD_BEEF);
         axi_write(32'h0000_0104, 32'hCAFE_F00D);

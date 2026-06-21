@@ -38,3 +38,17 @@ Living tracker. See `questions.md` for decisions/risks and
   ultraembedded controller under Icarus — M2 functional sim de-risked.
 - Template power-pad fix committed on branch fix-fd-io-power-pad-pins in
   /home/esifferm/GitHub/gf180mcu-project-template (off wafer-space/main), ready to PR.
+
+## Synthesis-frontend breakthrough (overnight)
+
+- yosys default Verilog frontend CANNOT derive verilog-ethernet's parameterized CRC `lfsr`
+  in finite time (constexpr `lfsr_mask`, >60s per instance, both LOOP/REDUCTION). Confirmed on
+  an unloaded box, so not contention.
+- Switched to the **slang** frontend (USE_SLANG) — elaborates the whole UDP stack in ~20s.
+- Two submodule patches (pushed to sifferman/alexforencich_ethernet@rmii a03ff41):
+  - lfsr.v: force LOOP style under the auto-defined YOSYS macro (yosys ignores the
+    translate_off guard around `define SIMULATION).
+  - arp_cache.v: replace the DATA_WIDTH=32 lfsr hash (crashes pinned yosys-slang) with an
+    XOR-fold hash (cache stores+checks full IP, so only collision rate changes).
+- Full chip_top now elaborates under slang (EXIT 0); RTL `make sim` still PASSES.
+- Next: validate slang synthesis step, then launch full GDS hardening.

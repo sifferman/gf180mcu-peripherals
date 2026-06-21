@@ -61,3 +61,14 @@ Living tracker. See `questions.md` for decisions/risks and
   (unused PTP ports; async-FIFO gray2bin yosys false-positive) -> ERROR_ON_SYNTH_CHECKS=false.
 - Full 3v3 GDS hardening (PnR/DRC/LVS) running locally (monitored). M1 Ethernet gold path.
 - Added cocotb/sim_udp_bridge.py + 'make sim-bridge' (drive dma.py against the sim).
+
+## M2 SDRAM fabric validated (standalone) + M1 hardening through floorplan
+
+- M2 RTL drafted + PASSES standalone iverilog test (`cocotb/models/tb_m2_fabric.v`):
+  AXI4-Lite master -> axil_interconnect -> { axil_ram (scratch), sdram_wrap->sdram_axi->
+  sdram_sim }. Both SRAM (0x0..) and SDRAM (0x1000_0..) regions write/read correctly.
+  Files: src/axi/axil_to_axi4.sv, axil_interconnect.sv, src/sdram/sdram_wrap.sv.
+  Remaining M2: wire into chip_core + chip_top pad mux (retype) + extend chip sim — done
+  AFTER M1 hardening completes (keep the tree consistent with the running build).
+- M1 (Ethernet) hardening: cleared synthesis+checks, **floorplan fits**, now in placement
+  prep (padring/macro placement/tap-endcap). PnR/CTS/routing/DRC/LVS to follow.

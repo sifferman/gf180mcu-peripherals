@@ -76,17 +76,19 @@ VERILOG_FILES:
 - dir::../src/chip_core.sv
 - dir::../src/chip_top.sv
 
-# NOTE on frontends:
-# - slang (USE_SLANG) elaborates the verilog-ethernet stack in ~20s BUT the pinned
-#   yosys-slang has a bug: two identical-parameter `lfsr` instances (verilog-ethernet
-#   uses many: FCS + ARP cache hashes) crash it with
-#   "Assertion 'location' failed" in slang Diagnostics::add. Minimal repro: two
-#   `lfsr #(...STYLE="AUTO"...)` instances. Not suppressible via -Wnone/--suppress-warnings.
-#   Revisit when yosys-slang is bumped (or patch lfsr.v / uniquify instances).
-# - Default yosys Verilog frontend is correct but slow deriving the CRC lfsr networks
-#   (minutes each, worse under machine contention). Using it for now.
-# USE_SLANG: True
-# SLANG_ARGUMENTS: ['--ignore-unknown-modules']
+# Use the slang frontend. Required here: yosys's default Verilog frontend is
+# pathologically slow deriving verilog-ethernet's parameterized CRC `lfsr`
+# (constexpr lfsr_mask, >60s PER instance, regardless of LOOP/REDUCTION style),
+# which stalls JsonHeader/Synthesis indefinitely. slang elaborates the whole
+# design in ~20s.
+# One caveat: the pinned yosys-slang asserts ("Assertion 'location' failed") on
+# the DATA_WIDTH=32 `lfsr` — used only by arp_cache's hash — so that hash was
+# replaced with a cheap XOR-fold (see third_party/.../arp_cache.v patch). The
+# 8-bit FCS lfsr instances are fine under slang.
+USE_SLANG: True
+# IO pad / SRAM / wafer-IP cells are physical macros (blackboxes from lib/lef),
+# not in VERILOG_FILES; treat unknown module instances as blackboxes.
+SLANG_ARGUMENTS: ['--ignore-unknown-modules']
 
 # Slightly smaller file sizes
 PRIMARY_GDSII_STREAMOUT_TOOL: klayout

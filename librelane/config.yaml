@@ -76,9 +76,10 @@ VERILOG_FILES:
 - dir::../src/chip_core.sv
 - dir::../src/chip_top.sv
 
-# Enable plugin for better SystemVerilog support
-# USE_SLANG: True
-# SLANG_ARGUMENTS: ['--keep-hierarchy']
+# Use the slang frontend: full SystemVerilog support, and it elaborates the
+# verilog-ethernet CRC/lfsr modules in seconds (yosys's default Verilog frontend
+# stalls for 20+ min deriving them).
+USE_SLANG: True
 
 # Slightly smaller file sizes
 PRIMARY_GDSII_STREAMOUT_TOOL: klayout

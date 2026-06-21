@@ -279,7 +279,8 @@ def chip_top_runner():
         build_args=build_args,
         waves=True,
     )
-    runner.test(hdl_toplevel=hdl_toplevel, test_module="chip_top_tb,", waves=True)
+    runner.test(hdl_toplevel=hdl_toplevel,
+                test_module=os.getenv("TEST_MODULE", "chip_top_tb"), waves=True)
 
 
 if __name__ == "__main__":

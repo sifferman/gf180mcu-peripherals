@@ -144,3 +144,7 @@ sim-sdram: ## Standalone SDRAM controller + open behavioral model test (iverilog
 		cocotb/models/sdram_sim.v
 	vvp cocotb/sim_build/tb_sdram
 .PHONY: sim-sdram
+
+sim-bridge: clone-pdk defines ## Bridge a UDP socket to the sim so dma.py drives the simulated chip
+	cd cocotb; TEST_MODULE=sim_udp_bridge PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} PAD=${PAD} SCL=${SCL} SRAM=${SRAM} python3 chip_top_tb.py
+.PHONY: sim-bridge

@@ -1,58 +1,29 @@
 # Open questions / decisions for review
 
-Logged autonomously while you're away (per your instruction not to prompt).
-Each item has the decision I made so work could continue — change any of them and I'll adjust.
+Logged autonomously while you're away. Resolved items have been removed.
+Background/decision record lives in STATUS.md and the plan file.
 
-## Resolved-with-a-default (override if you disagree)
+## Genuine open fork (affects M2 SDRAM pinout)
 
-1. **CI hardens to GDS, and that's the hard part.** `.github/workflows/ci.yml` runs
-   `make sim` → `make librelane-condensed` (full PnR to GDS) → manufacturability → `make sim-gl`.
-   For a fork the matrix is a single `default` config (Makefile defaults = **5 V**:
-   `gf180mcu_fd_sc_mcu7t5v0` / `gf180mcu_fd_io` / `gf180mcu_fd_ip_sram`).
-   - **Decision:** I'm building the design so it hardens under the **default 5 V** flow that CI
-     exercises (keeps CI green), while keeping everything parameterized so the **3 V** libraries
-     (`as_sc_mcu7t3v3` / `ocd_io` / `ocd_ip_sram`) are selectable via `SCL=/PAD=/SRAM=` and become
-     the local default for `make`. Reason: a 3 V CI run also needs `install-3v3-scl` (the 3 V SCL
-     isn't in the stock PDK) which CI doesn't do, and flipping CI to 3 V + adding that step is a
-     separate change I didn't want to make blind. **If you want CI itself to build 3 V**, say so and
-     I'll add the install step to the flow + flip the fork matrix.
+- **SDRAM pin strategy.** x16 SDRAM (39 drive pads) + RMII out (4) = 43 > 40 bidir, so the
+  full chip needs ~7 more drive-capable pads than the stock ring's 40. Two ways:
+  - **(default) Retype ~7 input-only pads to bidir** (`NUM_INPUT 12→5`, `NUM_BIDIR 40→47`):
+    keeps full **x16** SDRAM, no controller change, same 74-pad ring/positions/power. Only the
+    pad *cell type* changes at 7 positions (your custom PCB must drive those positions as I/O).
+  - **8-bit SDRAM**: bond DQ[7:0], tie UDQM high → ~30 drive pads, fits 40 without retyping,
+    but halves capacity/bandwidth. ultraembedded controller stays 16-bit, so it'd be a
+    "bond-8-of-16" (software uses the low byte) rather than a true x8.
+  - **I'm proceeding with the retype (full x16)** when I wire SDRAM into the top in M2. It's
+    isolated to the final pad mapping, so M2 logic/sim doesn't depend on this — flip it any time.
 
-2. **Sim has no `cocotbext-eth/axi` in the Nix devshell.** To keep CI self-contained I wrote the
-   Ethernet testbench in **pure cocotb + `struct`** (builds/parses ARP + UDP + the DMA protocol by
-   hand, drives the RMII di-bits directly). No new Python deps. The richer `cocotbext`-based bench
-   from `reference/vivado_nexys/sim` is kept for local VCS use.
+## For your PCB (not blocking RTL)
 
-3. **Full-chip GDS closure of all four peripherals at once is high-risk autonomously.** Strategy is
-   **incremental, keep-CI-green milestones**: (M1) Ethernet→on-chip-SRAM gold path hardens + sims;
-   (M2) +SDRAM controller; (M3) +SD card; (M4) +DPLL; (M5) top pin-mux/padring polish + 3 V. Each
-   milestone is a commit that should leave CI green. If a milestone won't close in time, it stays on
-   the branch un-merged rather than breaking the others. See STATUS.md for where I am.
+- **LAN8720A PHY strapping.** The design has no MDIO, so the PHY's address/mode (100M full-duplex,
+  auto-neg) is set by board straps. Confirm your PCB straps it as desired.
+- **If you retype input pads to bidir (above), confirm your PCB drives those positions as I/O.**
 
-4. **SDRAM sim model is encrypted (VCS/Questa/NC only).** Icarus/CI path uses a small open
-   behavioral W9825-like model I wrote; the encrypted `.vp` is gated behind `SIM=vcs`. (You already
-   flagged Icarus support comes later.)
+## Tooling
 
-5. **PLL control over Ethernet** = a memory-mapped CSR (`ctrl`/`enable`) on the AXI bus; only
-   `pll_in`/`pll_clk`/`lock` are pads (`pll_clk`+`lock` on the 2 analog pads). PLL does not clock the core.
-
-6. **Padring:** stock 74-pad 1×1 ring; ~7 input positions retyped to `bi_24t` bidir (same positions,
-   same power) so the 47 drive-capable datapath signals fit. SD + PLL-probe share datapath pads via a
-   mode strap.
-
-## Genuinely open (need your input when you're back)
-
-- **A1.** Do you want CI to build the **3 V** flow (adds `install-3v3-scl` + flips the matrix), or is
-  3 V-by-local-default + 5 V-in-CI acceptable for the MVP?
-- **A2.** LAN8720A PHY address/mode strapping is a **PCB** concern (no MDIO in the design). Confirm
-  your PCB straps the PHY to 100 M full-duplex, auto-neg as desired.
-- **A3.** SD demo: 16 dedicated LED pads vs. exposing the 2-byte value via a CSR read. I defaulted to
-  CSR-readable + a few status LEDs to save pads; say if you want the full 16-LED bank.
-- **A4.** If full-chip GDS won't close in the time available, which subset is most important to you to
-  have hardened first? (My default priority: Ethernet+SDRAM > SD > PLL.)
-
-## Tooling note (autonomous session)
-
-- `gh` CLI is **not authenticated** in this environment and the SSH push works, so:
-  the `peripherals-mvp` branch is pushed (CI triggers on push to any branch), but I
-  **could not open the PR or read CI results**. Please open the PR from the branch and
-  check Actions. I'm using local `librelane`/`make sim` runs as the CI proxy.
+- `gh` CLI is **not authenticated** in this environment. I can push (SSH works) but cannot open
+  PRs or read CI. Branches pushed: `peripherals-mvp` (this repo) and
+  `fix-fd-io-power-pad-pins` (your template fork). Please open/observe those PRs.

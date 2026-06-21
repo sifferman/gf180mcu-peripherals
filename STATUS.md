@@ -8,7 +8,7 @@ Living tracker. See `questions.md` for decisions/risks and
 - [ ] **M0** Repo scaffolding: submodules, src/ dirs, host dir, docs.
 - [x] **M1** Ethernet → on-chip SRAM gold path: RTL integrated in chip_core, pure-cocotb
       `make sim` passes (ARP + UDP write/read), hardens under CI default flow.
-- [ ] **M2** SDRAM controller (ultraembedded sdram_axi) on the AXI bus, open behavioral
+- [~] **M2** SDRAM controller (ultraembedded sdram_axi) on the AXI bus, open behavioral
       model sim, write-over-Ethernet test.
 - [ ] **M3** SD card file-to-LED block + sim.
 - [ ] **M4** Digital ring-oscillator DCO + DPLL controller, CSR-tuned, RTL sim + ngspice extraction.
@@ -29,3 +29,12 @@ Living tracker. See `questions.md` for decisions/risks and
 - M2 WIP (parked, not integrated): open behavioral SDRAM model cocotb/models/sdram_sim.v +
   standalone tb; AXI write/read-back currently times out (controller init/handshake — TBD).
   Per project note, SDRAM functional sim is a 'later' item (authoritative = encrypted .vp on VCS).
+
+- Switched ENTIRE flow to 3v3 (SCL=as_sc_mcu7t3v3/PAD=ocd_io/SRAM=ocd_ip_sram); pinned PDK
+  already ships these + the 3v3 SCL librelane config, so no install-3v3-scl needed. 3v3 RTL
+  sim passes. CI (fork 'default' matrix) now builds 3v3. Committed+pushed.
+- 3v3 full hardening running locally (past lint, in JsonHeader).
+- SDRAM behavioral model (cocotb/models/sdram_sim.v) now PASSES write/read-back vs the
+  ultraembedded controller under Icarus — M2 functional sim de-risked.
+- Template power-pad fix committed on branch fix-fd-io-power-pad-pins in
+  /home/esifferm/GitHub/gf180mcu-project-template (off wafer-space/main), ready to PR.

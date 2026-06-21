@@ -90,3 +90,11 @@ Living tracker. See `questions.md` for decisions/risks and
 - 3.3V (as_sc_mcu7t3v3 / ocd_io), slang frontend, 1x1 slot, cell area 5.5M um2.
 - This is a tapeout-grade GDS of the Ethernet UDP->on-chip-RAM gold path.
 - Next: integrate M2 (Ethernet+SDRAM) — RTL validated standalone — now that the flow is proven.
+
+## ✅ CLEAN GDS SIGN-OFF (M2 Ethernet+SDRAM) — 2026-06-21 08:00
+- Full flow EXIT 0, zero errors. Manufacturability: **Antenna PASS, LVS PASS, DRC PASS**.
+- GDS: final/gds/chip_top.gds (304 MB); run librelane/runs/RUN_2026-06-21_05-13-19/.
+- chip_core: eth UDP master -> axil_interconnect -> {scratch RAM (0x0), SDRAM (0x1000_0000)
+  via sdram_wrap/sdram_axi}. Padring retyped to 47 bidir / 5 input for the full x16 SDRAM bus.
+  Cell area 5.55M um2. 3.3V, slang.
+- This is the headline: a tapeout-grade GDS that writes external SDRAM over Ethernet.

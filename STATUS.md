@@ -83,3 +83,10 @@ Living tracker. See `questions.md` for decisions/risks and
   - Density: M2.4 (Metal2 >30% coverage, die-wide) — the known gf180 case handled by dummy fill
     in the wafer.space precheck; disabled the in-flow KLayout density check (template-intended).
 - Re-running for a clean sign-off (LVS + hold + DRC all clear).
+
+## ✅ CLEAN GDS SIGN-OFF (M1 Ethernet) — 2026-06-21 05:06
+- Full flow EXIT 0, zero errors. Manufacturability: **Antenna PASS, LVS PASS, DRC PASS**.
+- GDS: final/gds/chip_top.gds (301 MB); run librelane/runs/RUN_2026-06-21_02-21-43/.
+- 3.3V (as_sc_mcu7t3v3 / ocd_io), slang frontend, 1x1 slot, cell area 5.5M um2.
+- This is a tapeout-grade GDS of the Ethernet UDP->on-chip-RAM gold path.
+- Next: integrate M2 (Ethernet+SDRAM) — RTL validated standalone — now that the flow is proven.

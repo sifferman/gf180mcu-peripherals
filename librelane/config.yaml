@@ -44,7 +44,7 @@ VERILOG_FILES:
 - dir::../third_party/alexforencich_ethernet/lib/axis/rtl/axis_fifo.v
 - dir::../third_party/alexforencich_ethernet/lib/axis/rtl/priority_encoder.v
 - dir::../third_party/alexforencich_ethernet/rtl/arp.v
-- dir::../third_party/alexforencich_ethernet/rtl/arp_cache.v
+- dir::../src/patches/alexforencich_ethernet/arp_cache.v
 - dir::../third_party/alexforencich_ethernet/rtl/arp_eth_rx.v
 - dir::../third_party/alexforencich_ethernet/rtl/arp_eth_tx.v
 - dir::../third_party/alexforencich_ethernet/rtl/axis_gmii_rx.v
@@ -60,7 +60,7 @@ VERILOG_FILES:
 - dir::../third_party/alexforencich_ethernet/rtl/ip_complete.v
 - dir::../third_party/alexforencich_ethernet/rtl/ip_eth_rx.v
 - dir::../third_party/alexforencich_ethernet/rtl/ip_eth_tx.v
-- dir::../third_party/alexforencich_ethernet/rtl/lfsr.v
+- dir::../src/patches/alexforencich_ethernet/lfsr.v
 - dir::../third_party/alexforencich_ethernet/rtl/mac_ctrl_rx.v
 - dir::../third_party/alexforencich_ethernet/rtl/mac_ctrl_tx.v
 - dir::../third_party/alexforencich_ethernet/rtl/mac_pause_ctrl_rx.v

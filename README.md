@@ -1,136 +1,58 @@
-# gf180mcu Project Template
+# gf180mcu-peripherals
 
-Project template for wafer.space MPW runs using the gf180mcu PDK.
+A 3.3 V GF180MCU test chip and **reusable-IP library** for future tapeouts, built on the
+[wafer.space gf180mcu project template](https://github.com/wafer-space/gf180mcu-project-template).
+It integrates four peripherals on a shared on-chip AXI fabric driven over Ethernet:
 
-## Dependencies
+| Peripheral | Source | Status |
+|---|---|---|
+| **RMII Ethernet MAC + UDP→memory** (LAN8720A PHY) | [verilog-ethernet](https://github.com/alexforencich/verilog-ethernet) | ✅ integrated, RTL-sim passing |
+| **SDRAM controller** (Winbond W9825G6KH, x16) | [ultraembedded/core_sdram_axi4](https://github.com/ultraembedded/core_sdram_axi4) | controller + behavioral-model sim ✅; on-bus integration WIP |
+| **SD-card file→LED** | [WangXuan95 FPGA-SDcard-Reader](https://github.com/WangXuan95/FPGA-SDcard-Reader) | WIP |
+| **Digital ring-oscillator PLL** (mux-chain DCO) | this repo | WIP |
 
-Too manage all dependencies, the project template includes a Nix shell with all the required tools.
-Install Nix and LibreLane by following the Nix-based installation instructions: https://librelane.readthedocs.io/en/latest/installation/nix_installation/index.html
-To activate the shell, simply run `nix-shell` in the root directory of this repository. The subsequent steps assume that you are in the Nix shell of the project template.
+A host PC writes/reads on-chip memory over plain UDP (no soft CPU) — a hardware state machine
+turns UDP commands into AXI reads/writes. See `reference/vivado_nexys/docs/protocol.md`.
 
-## Prerequisites
-
-The project template uses the open_pdks gf180mcuD variant of the PDK.
-To clone the latest PDK version via [Ciel](https://github.com/fossi-foundation/ciel), run `make clone-pdk`.
-
-## Implement the Design
-
-With the Nix shell enabled, run the implementation:
-
-```
-make librelane
-```
-
-You can find all output artifacts in the `librelane/runs/<timestamp>/` directory.
-
-## View the Design
-
-After completion, you can view the design using the OpenROAD GUI:
+## Layout
 
 ```
-make librelane-openroad
+src/            chip_top (pads), chip_core (integration), and reusable blocks:
+  eth/          UDP→memory datapath (ported from reference/vivado_nexys)
+  axi/          AXI4-Lite RAM (on-chip gold-path target)
+  sdram/ sdcard/ dpll/ csr/   (per-peripheral, WIP)
+third_party/    vendored submodules (verilog-ethernet, core_sdram_axi4, SD reader, cocotbext-eth)
+cocotb/         testbenches; _eth/ = vendored deps-free RMII model; models/ = SDRAM behavioral model
+ethernet-host/  dma.py — host UDP tool (ping/write/read/test)
+librelane/      LibreLane (OpenLane2) flow config, slots, macros, PDN
+docs/           hardware-notes.md (PHY strapping, padring)
 ```
 
-Or using KLayout:
+## Build (LibreLane → GDS)
 
 ```
-make librelane-klayout
+nix-shell                 # or: nix develop
+make librelane            # 3.3 V flow: SCL as_sc_mcu7t3v3 / PAD ocd_io / SRAM ocd_ip_sram
 ```
+Defaults are 3.3 V (Makefile). The PDK is fetched by `make clone-pdk` (pinned commit).
 
-## Verification and Simulation
-
-For the verification of the chip we use [cocotb](https://www.cocotb.org/). Cocotb is a Python-based testbench environment. The simulator that is used by the project template is [Icarus Verilog](https://github.com/steveicarus/iverilog).
-
-The testbench is located in `cocotb/chip_top_tb.py`. To run the RTL simulation, run the following command:
+## Simulate
 
 ```
-make sim
+make sim          # RTL: ARP + UDP write/read-back over RMII (pure cocotb, no extra deps)
+make sim-sdram    # standalone SDRAM controller + behavioral model (iverilog)
+make sim-gl       # gate-level (after a run populates final/)
 ```
 
-To run the GL (gate-level) simulation, run the following command:
+## Notes / decisions
 
-```
-make sim-gl
-```
+- **3.3 V everywhere** (libs + CI). Stock 74-pad 1×1 ring; ~7 input pads retyped to bidir to fit
+  the full x16 SDRAM bus (same bondpad positions — see `docs/hardware-notes.md`).
+- Synthesis uses the **slang** frontend (`USE_SLANG`): yosys's default frontend cannot derive
+  verilog-ethernet's parameterized CRC `lfsr` in finite time. Two small submodule patches
+  (LOOP-style lfsr under yosys; cheap ARP-cache hash) make it tractable.
+- FIFO depths and the ARP cache are sized down from the FPGA defaults for ASIC area.
+- See `STATUS.md` for live progress and `questions.md` for open items.
 
-> [!NOTE]
-> You need to have the latest implementation of your design in the `final/` folder. After a run has completed without errors, the final views will be copied to `final/`.
-
-In both cases, a waveform file will be generated under `cocotb/sim_build/chip_top.fst`.
-You can view it using a waveform viewer, for example, [GTKWave](https://gtkwave.github.io/gtkwave/).
-
-```
-make sim-view
-```
-
-You can now update the testbench according to your design.
-
-## Implementing Your Own Design
-
-The source files for this template can be found in the `src/` directory. `chip_top.sv` defines the top-level ports and instantiates `chip_core`, chip ID (QR code) and the wafer.space logo. To allow for the default bonding setup, do not change the number of pads in order to keep the original bondpad positions. To be compatible with the default breakout PCB, do not change any of the power or ground pads. However, you can change the type of the signal pads, e.g. to bidirectional, input-only or e.g. analog pads. The template provides the `NUM_INPUT` and `NUM_BIDIR` parameters for this purpose.
-
-The actual pad positions are defined in the LibreLane configuration file under `librelane/config.yaml`. The variables `PAD_SOUTH`/`PAD_EAST`/`PAD_NORTH`/`PAD_WEST` determine the respective pad placement. The LibreLane configuration also allows you to customize the flow (enable or disable steps), specify the source files, set various variables for the steps, and instantiate macros. For more information about the configuration, please refer to the LibreLane documentation: https://librelane.readthedocs.io/en/latest/
-
-To implement your own design, simply edit `chip_core.sv`. The `chip_core` module receives the clock and reset, as well as the signals from the pads defined in `chip_top`. As an example, a 42-bit wide counter is implemented.
-
-> [!NOTE]
-> For more comprehensive SystemVerilog support, enable the `USE_SLANG` variable in the LibreLane configuration.
-
-## Choosing a Different Slot Size
-
-The template supports the following slot sizes: `1x1`, `0p5x1`, `1x0p5`, `0p5x0p5`.
-By default, the design is implemented using the `1x1` slot definition.
-
-To select a different slot size, simply set the `SLOT` environment variable.
-This can be done when invoking a make target:
-
-```
-SLOT=0p5x0p5 make librelane
-```
-
-Alternatively, you can export the slot size:
-
-```
-export SLOT=0p5x0p5
-```
-
-You can change the slot that is selected by default in the Makefile by editing the value of `DEFAULT_SLOT`.
-
-## Select Different IP Libraries
-
-The project template has support for selecting libraries with the below environment variables:
-
-| Env  | Available Values                                                          | Description                |
-|------|---------------------------------------------------------------------------|----------------------------|
-| SCL  | gf180mcu_fd_sc_mcu7t5v0, gf180mcu_fd_sc_mcu9t5v0, gf180mcu_as_sc_mcu7t3v3 | The standard cell library. |
-| PAD  | gf180mcu_fd_io, gf180mcu_ocd_io                                           | The I/O pad library.       |
-| SRAM | gf180mcu_fd_ip_sram, gf180mcu_ocd_ip_sram                                 | The SRAM library.          |
-
-For example, to build the 0p5x0p5 chip with 3v3 libraries:
-
-```
-SLOT=0p5x0p5 SCL=gf180mcu_as_sc_mcu7t3v3 PAD=gf180mcu_ocd_io SRAM=gf180mcu_ocd_ip_sram make librelane
-```
-
-The default values can be changed in the Makefile.
-
-> [!NOTE]
-> Not all of the community-created IPs have been tested yet, so support for them is experimental!
-
-## Building a Standalone Padring for Analog Design
-
-To build just the padring without any standard cell rows, digital routing or filler cells, run the following command:
-
-```
-make librelane-padring
-```
-
-It is also possible to build the padring for other slot sizes:
-
-```
-SLOT=0p5x0p5 make librelane-padring
-```
-
-## Precheck
-
-To check whether your design is suitable for manufacturing, run the [gf180mcu-precheck](https://github.com/wafer-space/gf180mcu-precheck) with your layout.
+Licensing: integrating WangXuan95's GPLv3 SD reader makes the combined design GPLv3; individual
+reusable blocks keep their own permissive headers.

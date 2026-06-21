@@ -15,27 +15,27 @@ PDK_COMMIT ?= 019cf7a3e0de79bb0e4b6213758882d283c65816
 # gf180mcu_osu_sc_gp12t3v3 (broken)
 
 ifeq ($(SCL),default)
-    SCL = gf180mcu_fd_sc_mcu7t5v0
+    SCL = gf180mcu_as_sc_mcu7t3v3
 endif
-SCL ?= gf180mcu_fd_sc_mcu7t5v0
+SCL ?= gf180mcu_as_sc_mcu7t3v3
 
 # Available PAD libraries:
 # gf180mcu_fd_io
 # gf180mcu_ocd_io
 
 ifeq ($(PAD),default)
-    PAD = gf180mcu_fd_io
+    PAD = gf180mcu_ocd_io
 endif
-PAD ?= gf180mcu_fd_io
+PAD ?= gf180mcu_ocd_io
 
 # Available SRAM macros:
 # gf180mcu_fd_ip_sram
 # gf180mcu_ocd_ip_sram
 
 ifeq ($(SRAM),default)
-    SRAM = gf180mcu_fd_ip_sram
+    SRAM = gf180mcu_ocd_ip_sram
 endif
-SRAM ?= gf180mcu_fd_ip_sram
+SRAM ?= gf180mcu_ocd_ip_sram
 
 ifeq ($(SRAM),gf180mcu_fd_ip_sram)
     MACROS = 5v

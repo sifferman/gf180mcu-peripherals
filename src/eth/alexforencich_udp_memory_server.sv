@@ -100,9 +100,9 @@ module alexforencich_udp_memory_server #(
         .CLOCK_INPUT_STYLE("BUFG"),
         .ENABLE_PADDING(1),
         .MIN_FRAME_LENGTH(64),
-        .TX_FIFO_DEPTH(4096),
-        .TX_FRAME_FIFO(1),
-        .RX_FIFO_DEPTH(4096),
+        .TX_FIFO_DEPTH(1024),   // ASIC: flop-based FIFO; 4096 was ~82K FFs (FPGA BRAM).
+        .TX_FRAME_FIFO(1),       // 1024 holds ~960B frames (store-and-forward).
+        .RX_FIFO_DEPTH(1024),
         .RX_FRAME_FIFO(1)
     ) eth_mac_inst (
         .rst(rst_i),
@@ -190,7 +190,9 @@ module alexforencich_udp_memory_server #(
 
     // UDP TX checksum is left 0 (disabled, legal IPv4) by udp_command_memory_bridge, so the
     // checksum generator (a 2048-deep payload FIFO) is not needed.
-    udp_complete #(.UDP_CHECKSUM_GEN_ENABLE(0)) udp_complete_inst (
+    // ARP_CACHE_ADDR_WIDTH=2 (4 entries): a test chip talks to ~1 host; the default
+    // 512-entry cache was ~41K flip-flops. (Also the wide arp hash; see arp_cache patch.)
+    udp_complete #(.UDP_CHECKSUM_GEN_ENABLE(0), .ARP_CACHE_ADDR_WIDTH(2)) udp_complete_inst (
         .clk(clk_i),
         .rst(rst_i),
         .s_eth_hdr_valid(rx_eth_hdr_valid),

@@ -73,6 +73,13 @@ VERILOG_FILES:
 - dir::../third_party/alexforencich_ethernet/rtl/udp_ip_tx.v
 # AXI fabric + on-chip memory
 - dir::../src/axi/axil_ram.sv
+- dir::../src/axi/axil_to_axi4.sv
+- dir::../src/axi/axil_interconnect.sv
+# SDRAM controller (ultraembedded) + wrapper
+- dir::../third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi.v
+- dir::../third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi_core.v
+- dir::../third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi_pmem.v
+- dir::../src/sdram/sdram_wrap.sv
 # Top + core
 - dir::../src/chip_core.sv
 - dir::../src/chip_top.sv

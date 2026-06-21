@@ -35,16 +35,26 @@ RTL sim PASS (real CRC ARP resolves) + full librelane synthesis clean.
 
 ## TODO: upstream fixes on the forks (git@github.com:sifferman/{yosys,yosys-slang})
 
-Two genuine upstream bugs remain (the repo just sidesteps them with the high limit):
-- **yosys-slang**: don't let slang's per-evaluation step counter accumulate design-wide —
-  reset `const_`'s step count per evaluation/instance, or raise/disable the ceiling for
-  already-synthesizable constfuncs. This is the real bug; you shouldn't need the flag.
-- **slang core**: `EvalContext::step()` can pass an empty `SourceLocation` to `addDiag`
-  (`StatementList::sourceRange.start()`), so hitting the limit asserts instead of emitting
-  `ConstEvalExceededMaxSteps`. Guard the location / use the subroutine location.
-- **yosys default frontend** (separate, pre-slang issue): still can't evaluate `lfsr_mask`
-  in finite time (>60s/instance). A pre-computed/const-folded `lfsr.v` would let stock yosys
-  build it without slang at all — lower priority now that slang works.
+### Status of the fork branches (pushed 2026-06-21)
+
+- **sifferman/yosys-slang @ `fix-evalcontext-step-accumulation`** — resets the reused
+  `EvalContext` step budget per top-level constant evaluation, so slang's
+  `maxConstexprSteps` is per-evaluation as documented (instead of accumulating design-wide).
+  IMPORTANT FINDING: the *crash itself is already fixed on yosys-slang master* — the
+  static-select fast-path commits (`2d4b055`, `7332909`) cut per-evaluation step cost ~10×,
+  so the accumulation no longer trips the 1M limit for the lfsr case. So our repo's real
+  options are: (a) keep `--max-constexpr-steps` on the pinned plugin (done, works), or
+  (b) **bump the yosys-slang pin** past those commits — then it works with the default limit
+  and we can drop the flag. The fork branch is a correctness/robustness improvement
+  (defense-in-depth against accumulation on pathological designs), not a fix for an
+  observable bug on current master.
+- **sifferman/yosys @ `lfsr-constfunc-slowness-investigation`** — root-cause analysis +
+  runnable minimal repro for the default-frontend `eval_const_function` slowness (still
+  present on yosys main). A real perf fix (memoize / stop re-cloning loop bodies) is a
+  larger, regression-sensitive change — documented as a starting point, not implemented.
+- **slang core** (separate fork would be needed): `EvalContext::step()` can pass an empty
+  `SourceLocation` to `addDiag`, so *any* design that legitimately exceeds the limit asserts
+  instead of emitting `ConstEvalExceededMaxSteps`. Latent upstream slang bug worth filing.
 
 ## Follow-up: evaluate sv2v instead of slang (user suggestion, 2026-06-21)
 

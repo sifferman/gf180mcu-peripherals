@@ -100,3 +100,30 @@ Living tracker. See `questions.md` for decisions/risks and
   via sdram_wrap/sdram_axi}. Padring retyped to 47 bidir / 5 input for the full x16 SDRAM bus.
   Cell area 5.55M um2. 3.3V, slang.
 - This is the headline: a tapeout-grade GDS that writes external SDRAM over Ethernet.
+
+## 2026-06-21 (later): real-CRC cleanup + M4 PLL + fork patches
+- **Real CRC restored, src/patches dropped** (commit 7547f71): root-caused the yosys-slang
+  lfsr assertion to slang's per-evaluation constexpr step limit accumulating across the
+  design (one reused EvalContext); fixed in-repo with `--max-constexpr-steps 1000000000` in
+  SLANG_ARGUMENTS, so the *true* CRC arp_cache hash elaborates. Submodule fully pristine.
+  Verified: RTL sim PASS (real CRC) + full Yosys synthesis clean. The crash is also already
+  fixed on yosys-slang *master* (static-select fast-paths) — see questions.md.
+- **GDS re-hardening with real CRC IN PROGRESS** — run RUN_2026-06-21_10-30-49 (the earlier
+  full run RUN_2026-06-21_09-13-01 was OOM-killed at step 31 during a load spike; restarted
+  clean). The committed source now uses real CRC, so final/ must be regenerated from this run
+  before it is tapeout-current.
+- **M4 digital PLL added** (commit, src/dpll/): binary-weighted mux-chain ring DCO
+  (`ring_dco.sv`, structural gf180 cells + dont_touch, behavioural sim model) +
+  bang-bang frequency-locked control (`dpll_ctrl.sv`, Gray-CDC edge counter, tune-band lock).
+  `make sim-dpll` PASS (DCO oscillates monotonically with tune; FLL converges and locks).
+  Standalone IP — not yet wired into chip_top (CSR control + analog observe pads = later step).
+- **DCO SPICE characterized** (`src/dpll/gen_ring_dco_spice.py`, `make dco-spice`): exports the
+  ring from gf180 transistor-level cell subckts and sweeps tune codes through ngspice
+  (needs ngspice >= 42 for the BSIM4 models; the system ngspice-34 is too old — used the nix
+  ngspice-45). Low codes give the expected monotonic tuning (code 0 ~337 MHz -> code 16
+  ~184 MHz, typical corner). High codes (32-127) read erratic/higher — consistent with
+  multi-mode oscillation in the long ring (multiple wavefronts); a production DCO would
+  constrain stage count / add single-edge startup. Usable monotonic range is the low codes.
+- **Upstream fork branches pushed**: sifferman/yosys-slang @ fix-evalcontext-step-accumulation
+  (reset step budget per eval) and sifferman/yosys @ lfsr-constfunc-slowness-investigation
+  (root-cause + repro for the default-frontend slowness). Details in questions.md.

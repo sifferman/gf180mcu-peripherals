@@ -148,3 +148,18 @@ sim-sdram: ## Standalone SDRAM controller + open behavioral model test (iverilog
 sim-bridge: clone-pdk defines ## Bridge a UDP socket to the sim so dma.py drives the simulated chip
 	cd cocotb; TEST_MODULE=sim_udp_bridge PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} PAD=${PAD} SCL=${SCL} SRAM=${SRAM} python3 chip_top_tb.py
 .PHONY: sim-bridge
+
+sim-dpll: ## Standalone digital PLL test: ring DCO (behavioural) + FLL lock (iverilog, no PDK)
+	mkdir -p cocotb/sim_build
+	iverilog -g2012 -DFUNCTIONAL -o cocotb/sim_build/tb_dpll \
+		src/dpll/ring_dco.sv src/dpll/dpll_ctrl.sv cocotb/models/tb_dpll.v
+	vvp cocotb/sim_build/tb_dpll
+.PHONY: sim-dpll
+
+# ngspice >= 42 is required for the gf180 BSIM4 models (mulu0 et al); override NGSPICE
+# to point at a new enough build if the default is too old.
+NGSPICE ?= ngspice
+dco-spice: clone-pdk ## Export ring_dco to SPICE and sweep tune codes through ngspice (freq-vs-code)
+	python3 src/dpll/gen_ring_dco_spice.py --pdk-root $(PDK_ROOT) --pdk $(PDK) --ngspice $(NGSPICE) \
+		--bits 7 --sweep 0,4,8,16,32,64,96,127 --run --workdir cocotb/sim_build
+.PHONY: dco-spice

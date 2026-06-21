@@ -138,16 +138,23 @@ def main():
 
     if args.sweep:
         codes = [int(c) for c in args.sweep.split(",")]
-        print(f"# ring_dco freq-vs-code sweep  bits={args.bits} corner={args.corner}")
-        print(f"# {'code':>5}  {'freq_MHz':>12}  {'period_ns':>12}")
+        print(f"# ring_dco freq-vs-code sweep  bits={args.bits} corner={args.corner}", flush=True)
+        print(f"# {'code':>5}  {'freq_MHz':>12}  {'period_ns':>12}", flush=True)
         for code in codes:
-            deck = gen_deck(design, models, cells, args.bits, code,
-                            corner=args.corner, tstop_ns=args.tstop_ns)
-            freq, period, txt, path = run_ngspice(deck, args.workdir, f"b{args.bits}_c{code}", ngspice=args.ngspice, meas_periods=10)
+            # Escalate tstop so fast (low) codes stay cheap and only slow (high) codes
+            # pay for a long transient.
+            freq = period = None
+            for tstop in (150.0, 500.0, 1600.0, 5000.0):
+                deck = gen_deck(design, models, cells, args.bits, code,
+                                corner=args.corner, tstop_ns=tstop)
+                freq, period, txt, path = run_ngspice(deck, args.workdir, f"b{args.bits}_c{code}",
+                                                      ngspice=args.ngspice, meas_periods=10)
+                if freq:
+                    break
             if freq:
-                print(f"  {code:>5}  {freq/1e6:>12.3f}  {period*1e9:>12.4f}")
+                print(f"  {code:>5}  {freq/1e6:>12.3f}  {period*1e9:>12.4f}", flush=True)
             else:
-                print(f"  {code:>5}  {'FAIL':>12}  (see {path})")
+                print(f"  {code:>5}  {'FAIL':>12}  (see {path})", flush=True)
                 sys.stderr.write(txt[-1500:] + "\n")
         return
 

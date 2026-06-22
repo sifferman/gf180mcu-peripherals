@@ -30,21 +30,30 @@ module tb_adpll;
   wire                dco_clk;
 
 `ifdef DCO_THERM
-  ring_dco_thermometer #(.NumTuneBits(NUM_TUNE)) u_dco (.enable_i(enable), .tune_i(tune), .clk_o(dco_clk));
+  ring_dco_thermometer #(.NumTuneBits(NUM_TUNE)) u_dco (
 `elsif DCO_MUXTAP
-  ring_dco_muxtap      #(.NumTuneBits(NUM_TUNE)) u_dco (.enable_i(enable), .tune_i(tune), .clk_o(dco_clk));
+  ring_dco_muxtap #(.NumTuneBits(NUM_TUNE)) u_dco (
 `else
-  ring_dco_binary             #(.NumTuneBits(NUM_TUNE)) u_dco (.enable_i(enable), .tune_i(tune), .clk_o(dco_clk));
+  ring_dco_binary #(.NumTuneBits(NUM_TUNE)) u_dco (
 `endif
+      .enable_i(enable),
+      .tune_i  (tune),
+      .clk_o   (dco_clk)
+  );
 
 `ifdef CTRL_LINEAR
   adpll_controller_linear #(.NumTuneBits(NUM_TUNE)) u_ctrl (
 `else
-  adpll_controller_bangbang        #(.NumTuneBits(NUM_TUNE)) u_ctrl (
+  adpll_controller_bangbang #(.NumTuneBits(NUM_TUNE)) u_ctrl (
 `endif
-      .clk_i(clk), .rst_ni(rst_n), .enable_i(enable),
-      .mul_i(CNT_W'(MUL)), .div_i(DIV_W'(DIV)), .dco_clk_i(dco_clk),
-      .tune_o(tune), .lock_o(lock)
+      .clk_i    (clk),
+      .rst_ni   (rst_n),
+      .enable_i (enable),
+      .mul_i    (CNT_W'(MUL)),
+      .div_i    (DIV_W'(DIV)),
+      .dco_clk_i(dco_clk),
+      .tune_o   (tune),
+      .lock_o   (lock)
   );
 
   integer cycles = 0, enable_cycle = 0;

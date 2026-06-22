@@ -26,49 +26,25 @@
 
 // adpll_controller_bangbang
 //
-// Primary source: bang-bang loop dynamics -- J. Lee, K. Kundert & B. Razavi, IEEE JSSC
-// 39(9), 2004 [DaDalt2004]; the 1-bit DFF-sign phase detector -- Hanumolu et al., IEEE
-// CICC 2007 [Hanumolu2007]. Synthesizer framing per Kratyuk et al., IEEE TCAS-II 2007.
+// Ref: Hanumolu et al., IEEE CICC 2007, Sec. IV-A (1-bit/DFF-sign detector);
+// Lee, Kundert & Razavi, IEEE JSSC 39(9), 2004 (bang-bang dynamics).
+// Bang-bang FLL loop filter: each window it steps the DCO tune code by the sign of
+// (measured - mul), driving F_DCO = (mul/div) * F_clk_i. Wraps adpll_freq_counter +
+// adpll_lock_detect.
 //
-// All-digital frequency-locked loop controller (bang-bang loop filter) that tunes a ring
-// DCO so F_DCO = (mul_i / div_i) * F_clk_i, the programmable-ratio synthesizer of the ADPLL
-// literature [Kratyuk2007 Fig.2: F_REF -> P2D -> LF -> DCO -> /N]. mul_i (the feedback
-// multiply ratio N, = target DCO edges per window) and div_i (the reference divider M, =
-// window length) are runtime inputs, so the ratio is set over Ethernet via a CSR.
-//
-// Pipeline (each block its own module for reuse):
-//   adpll_freq_counter  -- counts DCO edges over a div_i-cycle window, Gray-CDC into clk_i,
-//                       emits measured + sample strobe (the frequency-to-digital front end).
-//   this module      -- the loop filter.
-//   adpll_lock_detect-- declares lock when the operating point settles.
-//
-// Loop filter -- proportional + integral (PI), the standard digital loop filter
-//   [Kratyuk2007 §IV-C] "A digital equivalent of an analog loop filter consists of a
-//   proportional path with a gain alpha and an integral path with a gain beta";
-//   [Hanumolu2007 Fig.4] Kp/Ki paths. Here the frequency error is reduced to its sign --
-//   the 1-bit detector [Hanumolu2007 §IV-A] "A DFF simply detects the sign of the phase
-//   error and hence serves as a 1-bit TDC" -- which makes the loop robust to the ring's
-//   strongly nonlinear, code-dependent gain K_DCO (a coarse ring "is quite a challenging
-//   task, due to its highly nonlinear frequency vs. voltage characteristics"
-//   [Staszewski2006 §2.1]). The integral path (IntegralGain LSB/window) gives zero
-//   steady-state frequency error; the proportional path (ProportionalGain * sign) adds
-//   damping. Gains are small integers (the bang-bang analogue of the power-of-two alpha/beta
-//   the literature quantizes to, [Kratyuk2007 §V] "alpha ~= 2^-3, beta ~= 2^-7"); their
-//   programmability is itself the stated ADPLL advantage [Hanumolu2007 §III] "loop
-//   characteristics can be easily programmed and are also immune to process, voltage, and
-//   temperature (PVT) variations." A second-order (type-II) loop suffices [Kratyuk2007 §IV].
-//
-//   adpll_ctrl_linear is the survey sibling that uses the full multi-bit error (the complete
-//   [Kratyuk2007] linear procedure) instead of its sign.
-//
-// References (full citations also in this file's git history / docs/adpll_survey.md):
-//   [Kratyuk2007]  Kratyuk, Hanumolu, Moon, Mayaram, IEEE TCAS-II 54(3):247-251, 2007.
-//   [Hanumolu2007] Hanumolu, Wei, Moon, Mayaram, IEEE CICC 2007, pp.361-368.
-//   [Staszewski2006] Staszewski & Balsara, "All-Digital Freq. Synthesizer in DSM CMOS," Wiley 2006.
-//   [Razavi]       Razavi, "Design of CMOS Phase-Locked Loops" (type-II loop dynamics).
-//   [DaDalt2004]   Lee, Kundert, Razavi, IEEE JSSC 39(9), 2004 (bang-bang loop dynamics).
-
-`default_nettype none
+// Parameters:
+//   - NumTuneBits       : DCO tune-code width
+//   - MaxEdgesPerWindow : max edges/window (sets mul_i / measured width)
+//   - MaxWindowSize     : max window length (sets div_i width)
+//   - LockWindows       : in-band samples to declare lock
+//   - IntegralGain, ProportionalGain : per-window LSB steps (sign-scaled)
+// Ports:
+//   - clk_i, rst_ni, enable_i
+//   - mul_i     : target edges/window (multiply ratio N)
+//   - div_i     : window length, in reference cycles (divider M)
+//   - dco_clk_i : DCO clock feedback
+//   - tune_o    : DCO tune code
+//   - lock_o    : lock asserted
 
 module adpll_controller_bangbang #(
     parameter int unsigned NumTuneBits      = 7,
@@ -165,4 +141,3 @@ assign tune_o = tune_q;
 
 endmodule
 
-`default_nettype wire

@@ -149,16 +149,17 @@ sim-bridge: clone-pdk defines ## Bridge a UDP socket to the sim so dma.py drives
 	cd cocotb; TEST_MODULE=sim_udp_bridge PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} PAD=${PAD} SCL=${SCL} SRAM=${SRAM} python3 chip_top_tb.py
 .PHONY: sim-bridge
 
+ADPLL_TS  = cocotb/models/_sim_timescale.v
 ADPLL_RTL = $(wildcard src/adpll/*.sv src/adpll/controller/*.sv src/adpll/dco/*.sv)
 sim-adpll: ## Standalone digital ADPLL test: ring DCO (behavioural) + FLL lock (iverilog, no PDK)
 	mkdir -p cocotb/sim_build
-	iverilog -g2012 -o cocotb/sim_build/tb_adpll $(ADPLL_RTL) cocotb/models/tb_adpll.v
+	iverilog -g2012 -o cocotb/sim_build/tb_adpll $(ADPLL_TS) $(ADPLL_RTL) cocotb/models/tb_adpll.v
 	vvp cocotb/sim_build/tb_adpll
 .PHONY: sim-adpll
 
 sim-adpll-csr: ## Integrated ADPLL: program mul/div/enable over AXI4-Lite CSR, poll STATUS for lock (iverilog)
 	mkdir -p cocotb/sim_build
-	iverilog -g2012 -o cocotb/sim_build/tb_adpll_csr \
+	iverilog -g2012 -o cocotb/sim_build/tb_adpll_csr $(ADPLL_TS) \
 		src/csr/adpll_csr.sv src/adpll/controller/adpll_controller_bangbang.sv src/adpll/adpll_freq_counter.sv \
 		src/adpll/adpll_lock_detect.sv src/adpll/dco/ring_dco_binary.sv cocotb/models/tb_adpll_csr.v
 	vvp cocotb/sim_build/tb_adpll_csr | grep -E "CSR programmed|LOCKED|PASS|FAIL"
@@ -169,7 +170,7 @@ sim-adpll-survey: ## Compare the ADPLL controller variants (bang-bang PI vs line
 	@for ctrl in "bang-bang:" "linear:-DCTRL_LINEAR"; do \
 		name=$${ctrl%%:*}; def=$${ctrl#*:}; \
 		echo "==== controller: $$name ===="; \
-		iverilog -g2012 $$def -o cocotb/sim_build/tb_adpll_$$name $(ADPLL_RTL) cocotb/models/tb_adpll.v && \
+		iverilog -g2012 $$def -o cocotb/sim_build/tb_adpll_$$name $(ADPLL_TS) $(ADPLL_RTL) cocotb/models/tb_adpll.v && \
 		vvp cocotb/sim_build/tb_adpll_$$name | grep -E "LOCKED|PASS|FAIL"; \
 	done
 .PHONY: sim-adpll-survey
@@ -180,7 +181,7 @@ sim-adpll-matrix: ## Verify ALL 6 ADPLL variants (2 controllers x 3 DCOs): lock 
 	@for ctrl in "bb:" "lin:-DCTRL_LINEAR"; do \
 		for dco in "binary:" "therm:-DDCO_THERM" "muxtap:-DDCO_MUXTAP"; do \
 			cn=$${ctrl%%:*}; cd=$${ctrl#*:}; dn=$${dco%%:*}; dd=$${dco#*:}; \
-			iverilog -g2012 $$cd $$dd -o cocotb/sim_build/tb_mx_$${cn}_$${dn} $(ADPLL_RTL) cocotb/models/tb_adpll.v 2>/dev/null && \
+			iverilog -g2012 $$cd $$dd -o cocotb/sim_build/tb_mx_$${cn}_$${dn} $(ADPLL_TS) $(ADPLL_RTL) cocotb/models/tb_adpll.v 2>/dev/null && \
 			out=$$(vvp cocotb/sim_build/tb_mx_$${cn}_$${dn} 2>/dev/null); \
 			cyc=$$(echo "$$out" | grep -oE "lock_time=[0-9]+" | grep -oE "[0-9]+"); \
 			tune=$$(echo "$$out" | grep -oE "tune=[0-9]+ in-range" | grep -oE "[0-9]+"); \

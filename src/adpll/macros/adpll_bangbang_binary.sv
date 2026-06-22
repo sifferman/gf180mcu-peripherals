@@ -26,15 +26,18 @@
 
 // adpll_bangbang_binary
 //
-// Hardened-macro wrapper: one fixed ADPLL configuration = bang-bang PI (1-bit sign error) controller + binary-weighted delay-select ring DCO.
-// A hardened macro is a frozen physical block (no parameters), so each of the six
-// controller x DCO combinations is its own wrapper / DESIGN_NAME; this is the
-// bangbang x binary variant. Black-box interface for the chip: the host programs mul_i/div_i
-// and enable_i (via the CSR) and reads lock_o/tune_o back; dco_clk_o is the raw DCO
-// oscillation brought out for observation. Sources: controller [DaDalt2004/Hanumolu2007], DCO [Staszewski2006];
-// see src/adpll/controller/ and src/adpll/dco/ for the full derivations.
-
-`default_nettype none
+// Ref: Hanumolu CICC 2007 / Da Dalt JSSC 2004 (bangbang); Staszewski Wiley 2006 Ch.2-3 (binary). See the controller / DCO files for detail.
+// Hardened-macro wrapper for one fixed ADPLL config = bangbang controller + binary DCO. A macro
+// is a frozen block, so each controller x DCO combination is its own DESIGN_NAME; this is
+// the bangbang x binary variant, presented to the chip as a black box.
+//
+// Parameters:
+//   - NumTuneBits, MaxEdgesPerWindow, MaxWindowSize : passed through to the controller
+// Ports:
+//   - clk_i, rst_ni, enable_i : run + program
+//   - mul_i, div_i  : synthesizer ratio N / M (set over the CSR)
+//   - lock_o, tune_o : status
+//   - dco_clk_o     : raw DCO clock, brought out for observation
 
 module adpll_bangbang_binary #(
     parameter int unsigned NumTuneBits = 7,
@@ -85,4 +88,3 @@ assign dco_clk_o = dco_clk;
 
 endmodule
 
-`default_nettype wire

@@ -349,6 +349,9 @@ def chip_top_runner():
         always=True,
         includes=includes,
         build_args=build_args,
+        # Design RTL carries no `timescale; delays use explicit time-unit literals. Supply the
+        # simulation precision here at the tool level (the behavioural ring DCO has #-delays).
+        timescale=("1ns", "1ps"),
         waves=True,
     )
     runner.test(hdl_toplevel=hdl_toplevel,

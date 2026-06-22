@@ -26,15 +26,19 @@
 
 // adpll_lock_detect
 //
-// Shared lock detector for the ADPLL controllers. On each sample (sample_valid_i strobe) it
-// checks whether the watched control code (the integral operating point for a bang-bang
-// loop, or the output tune code for a linear loop) stays within +-Band of a running centre;
-// after LockWindows consecutive in-band samples it asserts lock_o, and any larger excursion
-// (the loop still slewing) re-centres the band and drops lock. Watching the slow control
-// code rather than the instantaneous frequency error is what makes lock detection robust to
-// the inherent +-1 LSB limit cycle of a bang-bang loop [DaDalt2004] (see adpll_controller_bangbang.sv).
-
-`default_nettype none
+// Ref: Lee, Kundert & Razavi, IEEE JSSC 39(9), 2004 (bang-bang limit-cycle lock).
+// Asserts lock_o once the watched code stays within +/-Band of a running centre for
+// LockWindows consecutive samples.
+//
+// Parameters:
+//   - Width       : width of the watched code
+//   - LockWindows : in-band samples required to declare lock
+//   - Band        : +/- tolerance, in code LSBs
+// Ports:
+//   - clk_i, rst_ni, enable_i
+//   - sample_valid_i : strobe qualifying code_i
+//   - code_i         : control code being watched
+//   - lock_o         : lock asserted
 
 module adpll_lock_detect #(
     parameter int unsigned Width       = 7,
@@ -94,4 +98,3 @@ assign lock_o = lock_q;
 
 endmodule
 
-`default_nettype wire

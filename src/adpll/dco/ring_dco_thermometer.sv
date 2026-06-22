@@ -26,31 +26,19 @@
 
 // ring_dco_thermometer
 //
-// Primary source: thermometer (unit-weighted) tuning + dynamic element matching --
-// Staszewski & Balsara, Wiley 2006, Sec. 3.5 [Staszewski2006].
+// Ref: Staszewski & Balsara (Wiley, 2006), Ch. 3 (thermometer coding / dynamic element
+// matching).
+// Ring oscillator tuned by a UNIT-weighted (thermometer) delay line: code k inserts k
+// identical unit-pair delays, so the curve is monotonic by construction (2^N-1 units).
+// SYNTHESIS = structural gf180 cells; else a behavioural model.
 //
-// DCO survey variant: a ring oscillator tuned by a UNIT-weighted (thermometer) delay
-// line, in contrast to ring_dco_binary's binary weighting. The binary input tune_i is
-// thermometer-decoded so that code k inserts exactly k identical unit delay stages (each
-// one inverter pair) into the loop, every stage gated by its own mux2.
-//
-// Why this variant: with binary weighting, the segments differ in size (1, 2, 4, ...
-// pairs), so layout/process mismatch between segments can make the period-vs-code curve
-// non-monotonic at a major carry (e.g. 0111->1000) -- a differential-nonlinearity (DNL)
-// problem. A unit-weighted (thermometer) array uses 2**NumTuneBits-1 identical stages, so
-// each code step adds one nominally-identical delay and the curve is monotonic by
-// construction; mismatch can be further averaged with dynamic element matching, the
-// approach Staszewski uses for the DCO varactor bank: [Staszewski2006 §3.5] frequency
-// resolution improved "through Sigma-Delta dithering and dynamic element matching." The
-// cost is area: 2**NumTuneBits-1 unit cells + muxes versus ring_dco_binary's N muxes.
-//
-// Same enable_i/tune_i/clk_o interface as ring_dco_binary, so the two are drop-in swappable in
-// adpll_controller_bangbang. See adpll_controller_bangbang.sv for the full reference list and src/adpll/README.md.
+// Parameters:
+//   - NumTuneBits : tune-code width (number of delay elements)
+// Ports:
+//   - enable_i : gate oscillation
+//   - tune_i   : unsigned tune code (higher = more delay = lower frequency)
+//   - clk_o    : oscillator output
 
-`timescale 1ns/1ps   // needed by the behavioural (ifndef SYNTHESIS) model's #-delays
-`default_nettype none
-
-(* keep_hierarchy *)
 module ring_dco_thermometer #(
     parameter int unsigned NumTuneBits = 7
 ) (
@@ -109,18 +97,18 @@ assign clk_o    = node[NumUnits];
 // Behavioural model: half-period grows linearly with the number of inserted units, i.e.
 // with the binary value of tune_i -- the same monotonic curve as ring_dco_binary's behavioural
 // model (the two differ only in silicon DNL, which a zero-delay sim cannot show).
-localparam integer BaseHalfPs = 1000;
-localparam integer StepHalfPs = 100;
+localparam realtime BaseHalf = 1.0ns;   // half-period at tune=0
+localparam realtime StepHalf = 0.1ns;   // added half-period per tune LSB
 logic   clk_r = 1'b1;
-integer half_ps;
+realtime half_period;
 
 always begin
     if (enable_i) begin
-        half_ps = BaseHalfPs + StepHalfPs * tune_i;
-        #(half_ps / 1000.0) clk_r = ~clk_r;
+        half_period = BaseHalf + StepHalf * tune_i;
+        #(half_period) clk_r = ~clk_r;
     end else begin
         clk_r = 1'b1;
-        #(BaseHalfPs / 1000.0);
+        #(BaseHalf);
     end
 end
 
@@ -130,4 +118,3 @@ assign clk_o = clk_r;
 
 endmodule
 
-`default_nettype wire

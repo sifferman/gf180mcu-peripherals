@@ -6,8 +6,6 @@
 // until the lock bit reads back, mirroring how a host would over Ethernet. Runs under
 // Icarus (SYNTHESIS undefined, behavioural DCO). PASSes on lock with an in-range tune.
 
-`timescale 1ns/1ps
-`default_nettype none
 
 module tb_adpll_csr;
   localparam int unsigned NUM_TUNE = 7;
@@ -20,7 +18,7 @@ module tb_adpll_csr;
   localparam [31:0] CTRL = 32'h0, MUL_A = 32'h4, DIV_A = 32'h8, STAT = 32'hC;
 
   reg clk = 1'b0;
-  always #20 clk = ~clk;          // 25 MHz
+  always #(20ns) clk = ~clk;          // 25 MHz
   reg rst_n = 1'b1;
 
   reg  [31:0] awaddr, wdata, araddr;
@@ -83,7 +81,7 @@ module tb_adpll_csr;
   integer i;
   initial begin
     awvalid=0; wvalid=0; bready=0; arvalid=0; rready=0; awaddr=0; wdata=0; araddr=0;
-    rst_n = 1'b1; #2 rst_n = 1'b0; repeat (5) @(posedge clk); rst_n = 1'b1; repeat (5) @(posedge clk);
+    rst_n = 1'b1; #(2ns) rst_n = 1'b0; repeat (5) @(posedge clk); rst_n = 1'b1; repeat (5) @(posedge clk);
 
     // program the synthesizer ratio, then enable -- exactly as a host would over Ethernet
     axil_write(MUL_A, MUL);
@@ -110,4 +108,3 @@ module tb_adpll_csr;
   end
 endmodule
 
-`default_nettype wire

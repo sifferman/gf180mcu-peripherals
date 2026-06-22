@@ -26,26 +26,19 @@
 
 // ring_dco_muxtap
 //
-// Primary source: digitally-controlled variable-length ring -- Kajiwara & Nakagawa (early
-// digital frequency synthesizer, cited in Staszewski & Balsara, Wiley 2006, Sec. 1).
+// Ref: Kajiwara & Nakagawa (early digital frequency synthesizer), via Staszewski & Balsara
+// (Wiley, 2006), Ch. 1.
+// Variable-LENGTH ring: a 2^N:1 binary mux tree selects which tap of an inverter-pair chain
+// closes the loop, so tune_i sets the ring length (and thus frequency) directly.
+// SYNTHESIS = structural gf180 cells; else a behavioural model.
 //
-// DCO survey variant: a variable-LENGTH ring. A single inverter-pair delay chain produces
-// 2**NumTuneBits taps; a 2**NumTuneBits:1 mux tree (binary, one tune bit per level) selects
-// which tap closes the loop back to the gate, so tune_i sets the ring length directly.
-// This is the classic digitally-controlled ring of Kajiwara & Nakagawa (noted as an early
-// digital frequency synthesizer in [Staszewski2006 §1]); it differs from ring_dco_binary /
-// ring_dco_thermometer, where the signal always traverses every stage and muxes insert or
-// bypass delay rather than re-route the feedback.
-//
-// Trade-off: the feedback always passes through the full NumTuneBits-deep mux tree, which
-// adds a fixed delay floor and loads the tap nodes -- but the active loop only contains the
-// selected number of inverter pairs. Same enable_i/tune_i/clk_o interface as the other DCOs
-// (drop-in swappable in adpll_controller_bangbang). See adpll_controller_bangbang.sv for the reference list.
+// Parameters:
+//   - NumTuneBits : tune-code width (number of delay elements)
+// Ports:
+//   - enable_i : gate oscillation
+//   - tune_i   : unsigned tune code (higher = more delay = lower frequency)
+//   - clk_o    : oscillator output
 
-`timescale 1ns/1ps   // needed by the behavioural (ifndef SYNTHESIS) model's #-delays
-`default_nettype none
-
-(* keep_hierarchy *)
 module ring_dco_muxtap #(
     parameter int unsigned NumTuneBits = 7
 ) (
@@ -107,18 +100,18 @@ assign clk_o    = tree_level[NumTuneBits][0];
 `else
 
 // Behavioural model: half-period grows linearly with the selected ring length (tune_i).
-localparam integer BaseHalfPs = 1000;
-localparam integer StepHalfPs = 100;
+localparam realtime BaseHalf = 1.0ns;   // half-period at tune=0
+localparam realtime StepHalf = 0.1ns;   // added half-period per tune LSB
 logic   clk_r = 1'b1;
-integer half_ps;
+realtime half_period;
 
 always begin
     if (enable_i) begin
-        half_ps = BaseHalfPs + StepHalfPs * tune_i;
-        #(half_ps / 1000.0) clk_r = ~clk_r;
+        half_period = BaseHalf + StepHalf * tune_i;
+        #(half_period) clk_r = ~clk_r;
     end else begin
         clk_r = 1'b1;
-        #(BaseHalfPs / 1000.0);
+        #(BaseHalf);
     end
 end
 
@@ -128,4 +121,3 @@ assign clk_o = clk_r;
 
 endmodule
 
-`default_nettype wire

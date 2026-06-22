@@ -26,30 +26,24 @@
 
 // adpll_controller_linear
 //
-// Primary source: digital proportional-integral loop filter, full design procedure with
-// power-of-two alpha/beta gains -- Kratyuk, Hanumolu, Moon & Mayaram, IEEE TCAS-II 54(3),
-// 2007 [Kratyuk2007].
+// Ref: Kratyuk, Hanumolu, Moon & Mayaram, IEEE TCAS-II 54(3), 2007 (full digital PI
+// loop-filter design procedure; power-of-two alpha/beta).
+// Linear PI FLL loop filter: drives the multi-bit frequency error (measured - mul) to zero
+// with anti-windup, so F_DCO = (mul/div) * F_clk_i. Same front end / lock detector as the
+// bang-bang sibling; only the filter differs.
 //
-// Controller survey variant: the LINEAR proportional-integral loop filter, the full
-// design-procedure form from [Kratyuk2007], in contrast to adpll_controller_bangbang's 1-bit (bang-bang)
-// error. Same synthesizer interface (mul_i = N, div_i = M; F_DCO = (mul/div)*F_clk_i) and
-// the same shared front end / lock detector as adpll_controller_bangbang; only the loop filter differs.
-// It uses the multi-bit frequency error directly:
-//
-//   e[n]    = measured[n] - mul                    (signed frequency error, edges/window)
-//   acc[n]  = clamp(acc[n-1] + e[n])               (integral: running sum, anti-windup)
-//   ctrl[n] = (e[n] >> AlphaShift) + (acc[n] >> BetaShift)   (alpha*e + beta*sum)
-//   tune    = clamp(ctrl[n], 0, 2^NumTuneBits-1)
-//
-// i.e. the digital loop filter H(z) = alpha + beta/(1-z^-1) [Kratyuk2007 Eq.14 /
-// Hanumolu2007 Fig.4] with gains as power-of-two right shifts ([Kratyuk2007 §V] "the
-// coefficients ... have to be approximated as power of two values: alpha ~= 2^-3, beta ~=
-// 2^-7"); the alpha/beta ratio sets the phase margin [Kratyuk2007 Eq.20]. Versus the
-// bang-bang sibling: faster acquisition (the proportional term slews with the error, not
-// +-1 LSB/window) and no limit cycle away from transients, at the cost of gains that must be
-// matched to K_DCO plus the anti-windup clamp. See adpll_controller_bangbang.sv for the reference list.
-
-`default_nettype none
+// Parameters:
+//   - NumTuneBits       : DCO tune-code width
+//   - MaxEdgesPerWindow : max edges/window (sets mul_i / measured width)
+//   - MaxWindowSize     : max window length (sets div_i width)
+//   - LockWindows, LockBand : lock-detector samples / +/- tolerance
+//   - AlphaShift, BetaShift : proportional / integral gains = 2^-shift
+// Ports:
+//   - clk_i, rst_ni, enable_i
+//   - mul_i, div_i : synthesizer ratio N / M (runtime)
+//   - dco_clk_i    : DCO clock feedback
+//   - tune_o       : DCO tune code
+//   - lock_o       : lock asserted
 
 module adpll_controller_linear #(
     parameter int unsigned NumTuneBits = 7,
@@ -159,4 +153,3 @@ assign tune_o = tune_q;
 
 endmodule
 
-`default_nettype wire

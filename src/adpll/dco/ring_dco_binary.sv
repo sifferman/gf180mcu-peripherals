@@ -26,51 +26,18 @@
 
 // ring_dco_binary
 //
-// Primary source: all-digital DCO / ring-oscillator tuning -- R. B. Staszewski & P. T.
-// Balsara, "All-Digital Frequency Synthesizer in Deep-Submicron CMOS," Wiley 2006
-// [Staszewski2006].
+// Ref: Staszewski & Balsara (Wiley, 2006), Ch. 2-3 (ring DCO, delay tuning).
+// All-standard-cell ring oscillator: a NAND gate gates/sustains oscillation and
+// binary-weighted inverter-pair segments (one mux each) insert delay by the binary value of
+// tune_i. SYNTHESIS = structural gf180 cells (keep/dont_touch); else a behavioural model.
 //
-// Digitally-controlled ring oscillator: one NAND2 gate (gates oscillation with enable_i
-// and contributes the single inversion that sustains the ring) followed by NumTuneBits
-// binary-weighted delay segments. Segment i is 2**i non-inverting inverter pairs; a mux2
-// per segment selects whether that delay is inserted (tune bit set) or bypassed, so the
-// inserted delay is proportional to the binary value of tune_i.
-//
-// Design choices, grounded in the ADPLL/DCO literature (see adpll_controller_bangbang.sv for the full
-// reference list):
-//
-//   * Ring oscillator (not LC). An LC DCO with a switched MOS-varactor bank is the
-//     low-phase-noise choice for RF synthesis ([Staszewski2006 §2.1-2.3] frequency tuning
-//     via "MOS varactors" / "LC Tank"), but it needs an on-chip inductor and analog
-//     varactors. A ring is fully synthesizable from standard cells. The accepted
-//     trade-off is phase noise: ring-oscillator synthesizers "are all based on a ring
-//     oscillator structure which inherently features relatively poor phase-noise
-//     characteristics" [Staszewski2006]. Acceptable here — this is an observe-only test
-//     DCO, not an RF LO.
-//
-//   * Tune by switching delay elements (not bias current). For a ring DCO, the textbook
-//     method is current steering: [Kratyuk2007 §II] "In the case of a ring-oscillator-
-//     based DCO, frequency tuning can be performed by digitally turning on and off bias
-//     current sources." That needs a current DAC (analog). To stay in a pure standard-cell
-//     flow we instead switch unit delay stages in/out of the loop with mux2 cells, which
-//     is what makes the period digitally controllable without any analog bias network.
-//
-//   * Binary weighting (segment i = 2**i pairs) gives a monotonic, ~uniform-step
-//     period-vs-code curve from one mux per bit (NumTuneBits muxes), rather than a
-//     thermometer array of 2**N unit cells.
-//
-// It is a hard combinational loop, so every cell is instantiated from the gf180mcu 3v3
-// library by name with keep/dont_touch (synthesis/PnR must not dissolve the loop), its
-// real frequency-vs-code curve only exists after extraction (characterize in SPICE, see
-// `make dco-spice`), and event-driven sim cannot evaluate a zero-delay loop so a
-// behavioural clock-generator is compiled (ifndef SYNTHESIS) instead. Standalone observe-
-// only block: it does not clock the core; enable_i/tune_i come from a CSR and clk_o/lock
-// reach the analog pads via adpll_controller_bangbang.
+// Parameters:
+//   - NumTuneBits : tune-code width (number of delay elements)
+// Ports:
+//   - enable_i : gate oscillation
+//   - tune_i   : unsigned tune code (higher = more delay = lower frequency)
+//   - clk_o    : oscillator output
 
-`timescale 1ns/1ps   // needed by the behavioural (ifndef SYNTHESIS) model's #-delays
-`default_nettype none
-
-(* keep_hierarchy *)
 module ring_dco_binary #(
     parameter int unsigned NumTuneBits = 7
 ) (
@@ -125,23 +92,24 @@ assign clk_o    = node[NumTuneBits];
 
 `else
 
-// Behavioural model (event-driven simulation only; SYNTHESIS undefined). A real ring oscillator has no period
-// in zero-delay RTL, so clk_o is a free-running clock whose half-period grows with tune_i.
-// The numbers are illustrative; SPICE gives the true curve. half_ps >= BaseHalfPs > 0
-// always, so there is never a zero-delay loop. Half-period is kept in integer ps (a
-// real'(vector) delay cast was unreliable) and `timescale 1ns/1ps converts via /1000.0.
-localparam integer BaseHalfPs = 1000;
-localparam integer StepHalfPs = 100;
+// Behavioural model (event-driven simulation only; SYNTHESIS undefined). A real ring
+// oscillator has no period in zero-delay RTL, so clk_o is a free-running clock whose
+// half-period grows with tune_i. The numbers are illustrative; SPICE gives the true curve.
+// Half-period is a realtime built from explicit ns time literals, so the #-delays carry their
+// own units and do not depend on a `timescale. half_period >= BaseHalf > 0 always, so there
+// is never a zero-delay loop.
+localparam realtime BaseHalf = 1.0ns;   // half-period at tune=0
+localparam realtime StepHalf = 0.1ns;   // added half-period per tune LSB
 logic   clk_r = 1'b1;
-integer half_ps;
+realtime half_period;
 
 always begin
     if (enable_i) begin
-        half_ps = BaseHalfPs + StepHalfPs * tune_i;
-        #(half_ps / 1000.0) clk_r = ~clk_r;
+        half_period = BaseHalf + StepHalf * tune_i;
+        #(half_period) clk_r = ~clk_r;
     end else begin
         clk_r = 1'b1;
-        #(BaseHalfPs / 1000.0);
+        #(BaseHalf);
     end
 end
 
@@ -151,4 +119,3 @@ assign clk_o = clk_r;
 
 endmodule
 
-`default_nettype wire

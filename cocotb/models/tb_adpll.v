@@ -11,8 +11,6 @@
 // 1.0+0.1*tune ns) and a 25 MHz reference, mul=1707/div=256 targets tune ~= 20. Reports
 // time-to-lock and the settled tune code, and PASSes if it locks in a sane mid-range code.
 
-`timescale 1ns/1ps
-`default_nettype none
 
 module tb_adpll;
   localparam int unsigned NUM_TUNE = 7;
@@ -22,7 +20,7 @@ module tb_adpll;
   localparam int unsigned DIV      = 256;    // window length in ref cycles (M)
 
   reg clk = 1'b0;
-  always #20 clk = ~clk;          // 25 MHz reference (40 ns)
+  always #(20ns) clk = ~clk;          // 25 MHz reference (40 ns)
 
   reg rst_n  = 1'b1;
   reg enable = 1'b0;
@@ -79,7 +77,7 @@ module tb_adpll;
 
   initial begin
     rst_n = 1'b1; enable = 1'b0;
-    #2 rst_n = 1'b0;                 // async-reset pulse for the gated DCO-domain counter
+    #(2ns) rst_n = 1'b0;                 // async-reset pulse for the gated DCO-domain counter
     repeat (5) @(posedge clk);
     rst_n = 1'b1;
     repeat (5) @(posedge clk);
@@ -88,4 +86,3 @@ module tb_adpll;
   end
 endmodule
 
-`default_nettype wire

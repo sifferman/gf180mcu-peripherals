@@ -26,23 +26,20 @@
 
 // adpll_freq_counter
 //
-// Shared front end for the ADPLL controllers: measures the DCO frequency by counting DCO
-// edges over a window of div_i reference (clk_i) cycles, and emits one measured-count
-// sample per window. With the controller driving the DCO to make measured == mul, the
-// loop synthesizes F_DCO = (mul/div) * F_clk_i -- i.e. div_i is the reference divider M and
-// the target count mul is the feedback-multiply ratio N of the classic synthesizer
-// [Kratyuk2007 Fig.2: F_REF -> P2D -> LF -> DCO -> /N]. Both mul and div are runtime inputs
-// so the ratio is programmable (set over Ethernet via a CSR).
+// Ref: Staszewski & Balsara, "All-Digital Frequency Synthesizer in Deep-Submicron CMOS"
+// (Wiley, 2006), Ch. 3 (variable-phase / DCO-edge counter).
+// Reference-gated frequency counter: counts DCO edges over a window of div_i reference
+// cycles and emits one count per window, Gray-coded across the DCO -> clk_i crossing.
 //
-// The DCO is asynchronous to clk_i, so the free-running edge count crosses domains as a
-// Gray code through a two-flop synchronizer: only one bit changes per edge, so a metastable
-// sample is wrong by at most one count, which the loop filter tolerates. The DCO-domain
-// counter uses async reset because its clock (dco_clk_i) is gated by enable_i.
-//
-// sample_valid_o is a one-cycle strobe in the clk_i domain marking a fresh measured_o; the
-// loop filter is always ready, so a valid strobe (not full ready/valid) is the interface.
-
-`default_nettype none
+// Parameters:
+//   - MaxEdgesPerWindow : max DCO edges counted per window (sets EdgeCountWidth)
+//   - MaxWindowSize     : max window length, in reference cycles (sets WindowSizeWidth)
+// Ports:
+//   - clk_i, rst_ni, enable_i : reference clock, async-low reset, run
+//   - div_i           : measurement window length, in reference cycles
+//   - dco_clk_i       : DCO clock being measured
+//   - measured_o      : DCO edge count over the last completed window
+//   - sample_valid_o  : one-cycle strobe marking a fresh measured_o
 
 module adpll_freq_counter #(
     parameter  int unsigned MaxEdgesPerWindow = (1 << 24) - 1,
@@ -60,10 +57,10 @@ module adpll_freq_counter #(
     output wire                         sample_valid_o
 );
 
-function automatic logic [EdgeCountWidth-1:0] bin2gray(input logic [EdgeCountWidth-1:0] b);
+function automatic logic [EdgeCountWidth-1:0] bin2gray(logic [EdgeCountWidth-1:0] b);
     bin2gray = b ^ (b >> 1);
 endfunction
-function automatic logic [EdgeCountWidth-1:0] gray2bin(input logic [EdgeCountWidth-1:0] g);
+function automatic logic [EdgeCountWidth-1:0] gray2bin(logic [EdgeCountWidth-1:0] g);
     gray2bin = g;
     for (int k_GEN = 1; k_GEN < EdgeCountWidth; k_GEN++)
         gray2bin = gray2bin ^ (g >> k_GEN);
@@ -145,4 +142,3 @@ assign sample_valid_o = sample_valid_q;
 
 endmodule
 
-`default_nettype wire

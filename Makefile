@@ -149,7 +149,7 @@ sim-bridge: clone-pdk defines ## Bridge a UDP socket to the sim so dma.py drives
 	cd cocotb; TEST_MODULE=sim_udp_bridge PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} PAD=${PAD} SCL=${SCL} SRAM=${SRAM} python3 chip_top_tb.py
 .PHONY: sim-bridge
 
-ADPLL_RTL = $(wildcard src/adpll/*.sv)
+ADPLL_RTL = $(wildcard src/adpll/*.sv src/adpll/dco/*.sv)
 sim-adpll: ## Standalone digital ADPLL test: ring DCO (behavioural) + FLL lock (iverilog, no PDK)
 	mkdir -p cocotb/sim_build
 	iverilog -g2012 -o cocotb/sim_build/tb_adpll $(ADPLL_RTL) cocotb/models/tb_adpll.v
@@ -170,7 +170,7 @@ sim-adpll-survey: ## Compare the ADPLL controller variants (bang-bang PI vs line
 # to point at a new enough build if the default is too old.
 NGSPICE ?= ngspice
 dco-spice: clone-pdk ## Export ring_dco to SPICE and sweep tune codes through ngspice (freq-vs-code)
-	python3 src/adpll/gen_ring_dco_spice.py --pdk-root $(PDK_ROOT) --pdk $(PDK) --ngspice $(NGSPICE) \
+	python3 src/adpll/dco/gen_ring_dco_spice.py --pdk-root $(PDK_ROOT) --pdk $(PDK) --ngspice $(NGSPICE) \
 		--bits 7 --sweep 0,4,8,16,32,64,96,127 --run --workdir cocotb/sim_build
 .PHONY: dco-spice
 
@@ -182,7 +182,7 @@ dco-spice-corners: clone-pdk ## DCO freq-vs-code across SS/TT/FF PVT corners (ng
 	@for corner in "ss 3.0 125" "typical 3.3 25" "ff 3.6 -40"; do \
 		set -- $$corner; \
 		echo "==== corner $$1 / $$2 V / $$3 C ===="; \
-		python3 src/adpll/gen_ring_dco_spice.py --pdk-root $(PDK_ROOT) --pdk $(PDK) --ngspice $(NGSPICE) \
+		python3 src/adpll/dco/gen_ring_dco_spice.py --pdk-root $(PDK_ROOT) --pdk $(PDK) --ngspice $(NGSPICE) \
 			--bits $(DCO_BITS) --corner $$1 --vdd $$2 --temp $$3 \
 			--sweep 0,16,32,64,96,127 --run --workdir cocotb/sim_build; \
 	done

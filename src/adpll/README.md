@@ -1,41 +1,68 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-# `adpll` — digital ring-oscillator PLL (DCO + frequency-locked loop)
+# `adpll` — all-digital ring-oscillator PLL
 
-A reusable, standalone digital PLL for GF180MCU 3.3 V. The oscillator is a digitally
-controlled ring (binary-weighted mux-chain delay), tuned by a frequency-locked loop. It is
-an **observe-only** block: it does **not** clock the core — control comes from a CSR (set over
-Ethernet in this chip) and `clk_o`/`lock` are meant for the analog observation pads.
+A reusable, all-standard-cell digital PLL for GF180MCU 3.3 V. It is a programmable-ratio
+frequency synthesizer: the controller tunes a ring DCO so that
 
-## Files
-| file | role |
-|---|---|
-| `ring_dco.sv` | binary-weighted ring oscillator. `NAND2` gate + per-bit weighted inverter-pair delay segments selected by `mux2`. Structural gf180 cells (`nand2_2`/`inv_2`/`mux2_2`) with `(* keep *)`/`(* dont_touch *)` for synth/SPICE; a behavioural (`ifndef SYNTHESIS`) clock model for digital sim. |
-| `adpll_ctrl.sv` | bang-bang frequency-locked loop. Gray-coded DCO edge counter CDC'd into the reference clock domain; per-window count vs `target_i`; tune ±1 per window; lock asserts when the tune code stays within a ±1 band for `LockWindows` windows. |
-| `gen_ring_dco_spice.py` | emits a SPICE deck for the ring from the PDK cell subckts and sweeps tune codes through ngspice (freq-vs-code). |
+> **F_DCO = (mul / div) · F_clk_i**
+
+where `mul` (the feedback-multiply ratio N) and `div` (the reference divider M) are runtime
+inputs, set over Ethernet through a CSR. It is **observe-only** — it does not clock the core;
+`clk_o` and `lock_o` are routed to the analog observation pads.
+
+The design is grounded in `reference/adpll/` with per-decision citations and quotes; the
+variant survey, the citations, and the simulation results live in
+[`../../docs/adpll_survey.md`](../../docs/adpll_survey.md).
+
+## Layout
+
+```
+adpll_freq_meas.sv     shared: Gray-CDC DCO-edge counter over a runtime div_i-cycle window
+adpll_lock_detect.sv   shared: code-band lock detector
+adpll_ctrl.sv          controller: bang-bang PI loop filter (1-bit/sign error)
+adpll_ctrl_linear.sv   controller: linear PI loop filter (multi-bit error, power-of-two gains)
+dco/
+  ring_dco.sv              DCO: binary-weighted delay-select ring (the default)
+  ring_dco_thermometer.sv  DCO: unit-weighted (thermometer) ring, monotonic by construction
+  ring_dco_muxtap.sv       DCO: variable-length ring (tap mux tree)
+  gen_ring_dco_spice.py    emit a SPICE deck for a ring DCO and sweep tune codes in ngspice
+```
+
+A controller (`adpll_ctrl*`) + a DCO (`ring_dco*`) form a loop; the two shared blocks are
+common to every controller. All variants share the same port interfaces, so they are
+drop-in swappable.
+
+## Sim/synth views (one macro: `SYNTHESIS`)
+
+A ring oscillator is a zero-delay combinational loop that an event-driven simulator cannot
+evaluate, so each DCO has two views selected by `SYNTHESIS` (the project's single sim/synth
+macro, per `../../docs/style.md`):
+
+- `` `ifdef SYNTHESIS `` — the structural gf180-cell ring (`nand2`/`inv`/`mux2`, all
+  `keep`/`dont_touch`). yosys-slang defines `SYNTHESIS=1`, so synthesis/PnR get this view.
+- `` `else `` — a behavioural `#`-delay clock model for digital sim (no macro needed).
+
+The real frequency-vs-code curve only exists after parasitic extraction, so characterize the
+DCO in SPICE, not in STA.
 
 ## Verify
+
 ```sh
-make sim-adpll                       # iverilog: DCO oscillates + FLL locks (behavioural DCO)
-make dco-spice NGSPICE=/path/ngspice # ngspice freq-vs-code sweep (needs ngspice >= 42 for the
-                                    # gf180 BSIM4 models; system ngspice-34 is too old)
+make sim-adpll          # iverilog: DCO oscillates + the loop locks (behavioural DCO)
+make sim-adpll-survey   # compare the controller variants (lock time + settled code)
+make dco-spice          # ngspice freq-vs-code at the typical corner
+make dco-spice-corners  # ngspice freq-vs-code across SS/TT/FF PVT corners (run regularly)
 ```
-A real ring oscillator has no period in zero-delay RTL, so digital sim uses the behavioural
-DCO; true frequency-vs-code comes from SPICE. Typical-corner SPICE shows clean monotonic tuning
-in the low-code range (e.g. ~337 MHz at code 0 → ~184 MHz at code 16); high codes exhibit
-multi-mode oscillation in the long ring (multiple circulating wavefronts) — keep tuning in the
-monotonic region, or constrain stage count / add single-edge startup for production use.
 
-## Integrating into a chip (TODO, not yet wired into chip_top)
-- Drive `enable_i`/`target_i` (and read `lock_o`) from a memory-mapped CSR.
-- Bring `ring_dco.clk_o` and `adpll_ctrl.lock_o` to the two analog pads.
-- Preserve the ring in PnR: `SYNTH_KEEP_HIERARCHY`/keep modules for `ring_dco`,
-  `RSZ_DONT_TOUCH` the oscillator nets, and extract the ring's frequency in SPICE rather than
-  trusting STA on the combinational loop.
+ngspice **>= 42** is required for the gf180 BSIM4 models (the system ngspice-34 rejects
+`mulu0` etc.); override with `make dco-spice NGSPICE=/path/to/ngspice`.
 
-## Variants & survey
+## Integrating into chip_top (TODO — not yet wired in)
 
-This is a survey subsystem: multiple DCO and controller variants (each its own module,
-shared front end in `adpll_freq_meas`/`adpll_lock_detect`), grounded in `reference/adpll/`
-with per-decision citations. See **`docs/adpll_survey.md`** for the variant matrix, the
-citations/quotes, the controller lock comparison (`make sim-adpll-survey`), and the
-PVT-corner DCO data (`make dco-spice-corners`).
+- Drive `enable_i`/`mul_i`/`div_i` (and read `lock_o`) from a memory-mapped CSR.
+- Bring the DCO `clk_o` and `lock_o` to the two analog observation pads.
+- Preserve the ring in PnR: keep-hierarchy the DCO, `RSZ_DONT_TOUCH` the oscillator nets, and
+  extract its frequency in SPICE rather than trusting STA on the combinational loop.
+- Size for **all corners**: the ring's frequency swings ~2.4× across PVT, so a fixed target
+  is not universally reachable — the programmable `mul`/`div` picks a reachable ratio per
+  chip (see the corner data in `../../docs/adpll_survey.md`).

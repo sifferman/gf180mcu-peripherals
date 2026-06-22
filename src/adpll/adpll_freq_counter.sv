@@ -112,7 +112,7 @@ always_comb freerunning_dco_edge_count_sync = gray2bin(freerunning_dco_edge_coun
 
 // Programmable measurement window: a clk_i cycle counter that rolls over every window_length_i cycles.
 logic [WindowSizeWidth-1:0] window_cycle_count_d,    window_cycle_count_q;
-logic [EdgeCountWidth-1:0]  count_at_window_start_d, count_at_window_start_q; // snapshot at last boundary
+logic [EdgeCountWidth-1:0]  count_at_window_start_d, count_at_window_start_q; // freerunning count at the last window boundary
 logic [EdgeCountWidth-1:0]  dco_edge_count_d,        dco_edge_count_q;
 logic                       sample_valid_d,          sample_valid_q;
 
@@ -125,7 +125,7 @@ always_comb begin
     sample_valid_d          = 1'b0;
     if (!enable_i) begin
         window_cycle_count_d    = '0;
-        count_at_window_start_d = freerunning_dco_edge_count_sync;
+        count_at_window_start_d = freerunning_dco_edge_count_sync;   // prime the start point so the first window after enable measures correctly
     end else if (window_tick) begin
         window_cycle_count_d    = '0;
         dco_edge_count_d        = freerunning_dco_edge_count_sync - count_at_window_start_q;

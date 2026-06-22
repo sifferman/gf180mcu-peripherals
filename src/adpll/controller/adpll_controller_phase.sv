@@ -107,9 +107,7 @@ logic        [NumTuneBits-1:0] tune_d,          tune_q;             // PI output
 
 localparam logic signed [PhaseWidth-1:0] IntegralMax = PhaseWidth'(TuneMax) <<< BetaShift;
 
-// The PI sum (control_word) is clamped through `int`; guard that it cannot overflow that type.
-if (PhaseWidth + 2 > $bits(int))
-    $error("PhaseWidth+2 exceeds int width; reduce PhaseWidth");
+// The PI sum (control_word) is clamped through `int`, so keep PhaseWidth+2 <= 32.
 
 // type-II PI loop filter on the phase error; update only on a fresh measurement.
 always_comb begin

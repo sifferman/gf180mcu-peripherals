@@ -39,7 +39,7 @@ def pdk_paths(pdk_root, pdk="gf180mcuD"):
     return design, models, cells
 
 
-TOPOLOGIES = ("binary", "thermometer", "muxtap")
+TOPOLOGIES = ("binary", "thermometer", "muxtap", "coarsefine")
 
 
 def _inv_pair(a, src, mid, dst):
@@ -99,11 +99,43 @@ def _ring_muxtap(a, bits, code):
     return "OUT"
 
 
-_RINGS = {"binary": _ring_binary, "thermometer": _ring_thermometer, "muxtap": _ring_muxtap}
+def _ring_coarsefine(a, bits, code, fine_bits=3):
+    """ring_dco_coarsefine: the high (bits-fine_bits) drive a thermometer COARSE bank whose unit
+    delay is 2**fine_bits inverter pairs; the low fine_bits drive a thermometer FINE bank whose
+    unit delay is one pair. Coarse unit = 2**fine_bits fine units, so the banks splice into one
+    monotonic curve. Each select is a hard tie since `code` is fixed."""
+    coarse_bits  = bits - fine_bits
+    num_coarse   = (1 << coarse_bits) - 1
+    num_fine     = (1 << fine_bits) - 1
+    coarse_pairs = 1 << fine_bits
+    coarse = code >> fine_bits
+    fine   = code & ((1 << fine_bits) - 1)
+    a(f"Xgate VDD VNW VPW VSS node0 OUT enable {CELL}__nand2_2")
+    node = "node0"
+    for k in range(num_coarse):                          # coarse bank
+        d_prev = node
+        for j in range(coarse_pairs):
+            _inv_pair(a, d_prev, f"c{k}_{j}m", f"c{k}_{j}o")
+            d_prev = f"c{k}_{j}o"
+        sel = "VDD" if k < coarse else "0"
+        a(f"Xcsel{k} VDD VNW VPW VSS {sel} {d_prev} {node} cn{k} {CELL}__mux2_2")  # S B A Y
+        node = f"cn{k}"
+    for k in range(num_fine):                            # fine bank
+        _inv_pair(a, node, f"f{k}m", f"f{k}d")
+        sel = "VDD" if k < fine else "0"
+        nxt = "OUT" if k == num_fine - 1 else f"fn{k}"
+        a(f"Xfsel{k} VDD VNW VPW VSS {sel} f{k}d {node} {nxt} {CELL}__mux2_2")
+        node = nxt
+    return "OUT"
 
 
-def gen_deck(design, models, cells, bits, code, topology="binary", vdd=3.3, corner="typical",
-             temp=25.0, tstop_ns=1600.0, tstep_ps=10.0, settle_rise=6, meas_periods=10):
+_RINGS = {"binary": _ring_binary, "thermometer": _ring_thermometer, "muxtap": _ring_muxtap,
+          "coarsefine": _ring_coarsefine}
+
+
+def gen_deck(design, models, cells, bits, code, topology="binary", fine_bits=3, vdd=3.3,
+             corner="typical", temp=25.0, tstop_ns=1600.0, tstep_ps=10.0, settle_rise=6,
+             meas_periods=10):
     """Return a SPICE deck string for one tune code / topology at one PVT corner. Mirrors
     the three RTL DCOs in src/adpll/dco/. Since the tune code is fixed per run, every mux
     select is a hard tie to VDD/VSS (no tune-net drivers needed)."""
@@ -126,7 +158,8 @@ def gen_deck(design, models, cells, bits, code, topology="binary", vdd=3.3, corn
     # enable: rise at 1 ns to kick-start oscillation
     a("Ven  enable 0 PWL(0 0 1n 0 1.05n {VDD})")
     a("")
-    out = _RINGS[topology](a, bits, code)
+    out = _ring_coarsefine(a, bits, code, fine_bits) if topology == "coarsefine" \
+          else _RINGS[topology](a, bits, code)
     a(f"Cload {out} 0 1f")               # tiny load on the output node
     a("")
     a(".tran {}p {}n uic".format(tstep_ps, tstop_ns))
@@ -169,7 +202,9 @@ def main():
     ap.add_argument("--bits", type=int, default=7)
     ap.add_argument("--code", type=int, default=0)
     ap.add_argument("--topology", default="binary", choices=TOPOLOGIES,
-                    help="DCO topology to emit (mirrors the three src/adpll/dco RTL variants)")
+                    help="DCO topology to emit (mirrors the src/adpll/dco RTL variants)")
+    ap.add_argument("--fine-bits", type=int, default=3,
+                    help="coarsefine only: low bits driving the fine bank (rest drive coarse)")
     ap.add_argument("--corner", default="typical", help="process corner: typical|ss|ff|fs|sf")
     ap.add_argument("--vdd", type=float, default=3.3, help="supply voltage corner")
     ap.add_argument("--temp", type=float, default=25.0, help="temperature corner (C)")
@@ -195,7 +230,8 @@ def main():
             freq = period = None
             for tstop in (150.0, 500.0, 1600.0, 5000.0):
                 deck = gen_deck(design, models, cells, args.bits, code, topology=args.topology,
-                                corner=args.corner, vdd=args.vdd, temp=args.temp, tstop_ns=tstop)
+                                fine_bits=args.fine_bits, corner=args.corner, vdd=args.vdd,
+                                temp=args.temp, tstop_ns=tstop)
                 freq, period, txt, path = run_ngspice(deck, args.workdir, f"{args.topology}_b{args.bits}_c{code}",
                                                       ngspice=args.ngspice, meas_periods=10)
                 if freq:
@@ -208,7 +244,8 @@ def main():
         return
 
     deck = gen_deck(design, models, cells, args.bits, args.code, topology=args.topology,
-                    corner=args.corner, vdd=args.vdd, temp=args.temp, tstop_ns=args.tstop_ns)
+                    fine_bits=args.fine_bits, corner=args.corner, vdd=args.vdd, temp=args.temp,
+                    tstop_ns=args.tstop_ns)
     if args.run:
         freq, period, txt, path = run_ngspice(deck, args.workdir, f"{args.topology}_b{args.bits}_c{args.code}", ngspice=args.ngspice, meas_periods=10)
         print(txt)

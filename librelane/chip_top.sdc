@@ -79,6 +79,29 @@ puts "\[INFO] Setting timing derate to: $::env(TIME_DERATING_CONSTRAINT)%"
 set_timing_derate -early [expr 1-[expr $::env(TIME_DERATING_CONSTRAINT) / 100]]
 set_timing_derate -late [expr 1+[expr $::env(TIME_DERATING_CONSTRAINT) / 100]]
 
+# --- ADPLL ring-DCO clock (observe-only, free-running) ------------------------------
+# The ring DCO is a self-timed oscillator. chip_core does `assign analog[0] = pll_dco_clk`,
+# so after synthesis the DCO oscillation net IS analog_PAD[0] (the final ring mux drives
+# .Y(analog_PAD[0]) and the feedback NAND reads .B(analog_PAD[0])); it also clocks the
+# frequency-measure counter. It MUST be declared a clock: leaving it undefined makes CTS add
+# clock-tree nets that the LVS netlist lacks (53 unmatched CLK nets -> "Netlists do not
+# match"). Declare it (nominal fastest-corner 2 ns / 500 MHz) and make it asynchronous to the
+# core clock so STA treats the freq_meas CDC correctly. Guarded so builds without the ADPLL
+# are unaffected. The ring's combinational loop is broken by the timing engine; the ring
+# cells are preserved by (* keep *)/(* dont_touch *) in ring_dco.sv.
+set dco_net [get_nets -quiet {analog_PAD[0]}]
+if { $dco_net == "" } {
+    set dco_net [get_pins -quiet -hierarchical "*i_pll_dco*u_sel*Y*"]
+}
+if { $dco_net != "" } {
+    puts "\[INFO] Defining ADPLL dco_clk on: $dco_net"
+    create_clock -name dco_clk -period 2.0 $dco_net
+    catch { set_clock_groups -asynchronous \
+        -group [get_clocks $clock_port] -group [get_clocks dco_clk] }
+} else {
+    puts "\[INFO] No ADPLL DCO net found; skipping dco_clk (build without ADPLL)."
+}
+
 if { [info exists ::env(OPENLANE_SDC_IDEAL_CLOCKS)] && $::env(OPENLANE_SDC_IDEAL_CLOCKS) } {
     unset_propagated_clock [all_clocks]
 } else {

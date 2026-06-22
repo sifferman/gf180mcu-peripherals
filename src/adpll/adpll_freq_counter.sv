@@ -120,10 +120,10 @@ always_comb begin
         count_at_window_start_d = dco_edge_count_sync;
     end else if (window_tick) begin
         window_cycle_count_d    = '0;
-        // COUNTER1 = count at the window's start, COUNTER2 = count now (its end). The edges in
-        // this window = COUNTER2 - COUNTER1, and a wrap between them cancels in the unsigned subtract.
-        dco_edge_count_d        = dco_edge_count_sync - count_at_window_start_q;  // COUNTER2 - COUNTER1
-        count_at_window_start_d = dco_edge_count_sync;   // becomes COUNTER1 for the next window
+        // edges this window = dco_edge_count_sync (count now) - count_at_window_start_q (count at
+        // the window's start); a wrap between the two cancels in the unsigned subtraction.
+        dco_edge_count_d        = dco_edge_count_sync - count_at_window_start_q;
+        count_at_window_start_d = dco_edge_count_sync;   // start point for the next window
         sample_valid_d          = 1'b1;
     end
 end

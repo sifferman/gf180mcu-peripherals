@@ -70,9 +70,9 @@ function automatic logic [EdgeCountWidth-1:0] gray2bin(logic [EdgeCountWidth-1:0
         gray2bin = gray2bin ^ (g >> i);
 endfunction
 
-// DCO domain: free-running edge counter. Wrap is harmless -- the measurement is a difference of
-// snapshots, so an unsigned subtraction cancels one wrap (valid while a window <= MaxEdgesPerWindow).
-// A Gray copy crosses into clk_i: one bit changes per edge, safe through the synchronizer below.
+
+// DCO domain: free-running edge counter, with a Gray-coded copy for the clock crossing
+// (one bit changes per edge, so it survives the two-flop synchronizer below).
 logic [EdgeCountWidth-1:0] dco_edge_count_binary_d, dco_edge_count_binary_q;
 logic [EdgeCountWidth-1:0] dco_edge_count_gray_d,   dco_edge_count_gray_q;
 always_comb dco_edge_count_binary_d = dco_edge_count_binary_q + 1'b1;
@@ -86,6 +86,7 @@ always_ff @(posedge dco_clk_i or negedge rst_ni) begin
         dco_edge_count_gray_q   <= dco_edge_count_gray_d;
     end
 end
+
 
 // Reference domain: two-flop Gray synchronizer (gray_sync_q1 may be metastable; gray_sync_q2 is settled).
 logic [EdgeCountWidth-1:0] gray_sync_q1, gray_sync_q2;
@@ -119,8 +120,10 @@ always_comb begin
         count_at_window_start_d = dco_edge_count_sync;
     end else if (window_tick) begin
         window_cycle_count_d    = '0;
-        count_at_window_start_d = dco_edge_count_sync;
+        // edges this window = counter now - counter at window start. Both are reads of the same
+        // free-running counter, so a wrap between them cancels in the unsigned subtraction.
         dco_edge_count_d        = dco_edge_count_sync - count_at_window_start_q;
+        count_at_window_start_d = dco_edge_count_sync;   // start point for the next window
         sample_valid_d          = 1'b1;
     end
 end

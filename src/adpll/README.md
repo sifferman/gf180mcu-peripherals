@@ -10,7 +10,7 @@ where `mul` (the feedback-multiply ratio N) and `div` (the reference divider M) 
 inputs, set over Ethernet through a CSR. It is **observe-only** — it does not clock the core;
 `clk_o` and `lock_o` are routed to the analog observation pads.
 
-The design is grounded in `reference/adpll/` with per-decision citations and quotes; the
+The design is grounded in the ADPLL literature with per-decision citations and quotes; the
 variant survey, the citations, and the simulation results live in
 [`../../docs/adpll_survey.md`](../../docs/adpll_survey.md).
 

@@ -2,7 +2,7 @@
 
 Reference for the breakout PCB. Not RTL-blocking; captured so it isn't lost.
 
-## LAN8720A PHY strapping (from reference/8720a.pdf §3.7)
+## LAN8720A PHY strapping (from the Microchip LAN8720A datasheet §3.7)
 
 The design uses no MDIO, so the PHY is configured by reset-latched straps on its
 RMII/LED pins. Augment with ~10 kΩ external resistors (the pins also carry live

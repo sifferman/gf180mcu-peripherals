@@ -74,9 +74,17 @@ module adpll_ctrl_linear #(
 wire [CountWidth-1:0] measured;
 wire                  sample_valid;
 
-adpll_freq_meas #(.CountWidth(CountWidth), .DivWidth(DivWidth)) u_meas (
-    .clk_i, .rst_ni, .enable_i, .div_i, .dco_clk_i,
-    .measured_o(measured), .sample_valid_o(sample_valid)
+adpll_freq_meas #(
+    .CountWidth(CountWidth),
+    .DivWidth  (DivWidth)
+) u_meas (
+    .clk_i,
+    .rst_ni,
+    .enable_i,
+    .div_i,
+    .dco_clk_i,
+    .measured_o    (measured),
+    .sample_valid_o(sample_valid)
 );
 
 localparam int unsigned TuneMax  = (1 << NumTuneBits) - 1;
@@ -87,15 +95,15 @@ logic [NumTuneBits-1:0]        tune_q;
 
 wire signed [CountWidth+1:0] error = $signed({2'b0, measured}) - $signed({2'b0, mul_i});
 
-// Integral accumulator with anti-windup: keep beta*acc inside the tune range.
+// Integral accumulator step with anti-windup: keep beta*acc inside the tune range.
 localparam logic signed [AccWidth-1:0] AccMax = AccWidth'(TuneMax) <<< BetaShift;
-wire signed [AccWidth-1:0] acc_sum = acc_q + AccWidth'(error);
-wire signed [AccWidth-1:0] acc_d   = (acc_sum < 0)      ? '0     :
-                                     (acc_sum > AccMax) ? AccMax : acc_sum;
+wire signed [AccWidth-1:0] acc_sum  = acc_q + AccWidth'(error);
+wire signed [AccWidth-1:0] acc_step = (acc_sum < 0)      ? '0     :
+                                      (acc_sum > AccMax) ? AccMax : acc_sum;
 
 // PI output: ctrl = alpha*e + beta*acc (gains are arithmetic right shifts).
 wire signed [CountWidth+1:0] prop_term  = error >>> AlphaShift;
-wire signed [AccWidth-1:0]   integ_term = acc_d >>> BetaShift;
+wire signed [AccWidth-1:0]   integ_term = acc_step >>> BetaShift;
 wire signed [AccWidth+1:0]   ctrl       = (AccWidth+2)'(prop_term) + (AccWidth+2)'(integ_term);
 
 function automatic logic [NumTuneBits-1:0] clamp(input logic signed [AccWidth+1:0] v);
@@ -103,24 +111,42 @@ function automatic logic [NumTuneBits-1:0] clamp(input logic signed [AccWidth+1:
     else if (v > (AccWidth+2)'(TuneMax))  clamp = NumTuneBits'(TuneMax);
     else                                  clamp = NumTuneBits'(v);
 endfunction
-wire [NumTuneBits-1:0] tune_d = clamp(ctrl);
+wire [NumTuneBits-1:0] tune_step = clamp(ctrl);
+
+// Update only on a fresh measurement; the gating lives here in _d, not in the always_ff.
+logic signed [AccWidth-1:0] acc_d;
+logic [NumTuneBits-1:0]     tune_d;
+always_comb begin
+    acc_d  = acc_q;
+    tune_d = tune_q;
+    if (enable_i && sample_valid) begin
+        acc_d  = acc_step;
+        tune_d = tune_step;
+    end
+end
 
 always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
         acc_q  <= '0;
         tune_q <= {NumTuneBits{1'b0}};
-    end else if (enable_i && sample_valid) begin
+    end else begin
         acc_q  <= acc_d;
         tune_q <= tune_d;
     end
 end
 
 // The linear loop settles to a near-static code, so watch the output tune directly.
-adpll_lock_detect #(.Width(NumTuneBits), .LockWindows(LockWindows), .Band(LockBand)) u_lock (
-    .clk_i, .rst_ni, .enable_i,
+adpll_lock_detect #(
+    .Width      (NumTuneBits),
+    .LockWindows(LockWindows),
+    .Band       (LockBand)
+) u_lock (
+    .clk_i,
+    .rst_ni,
+    .enable_i,
     .sample_valid_i(sample_valid),
-    .code_i(tune_q),
-    .lock_o(lock_o)
+    .code_i        (tune_q),
+    .lock_o        (lock_o)
 );
 
 assign tune_o = tune_q;

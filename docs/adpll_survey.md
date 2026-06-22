@@ -1,7 +1,7 @@
 # ADPLL design survey (gf180mcu, all-standard-cell)
 
 A survey of all-digital PLL (ADPLL) building-block variants for the `src/adpll/` subsystem,
-grounded in `reference/adpll/`. Every block is built **only** from gf180mcu standard cells
+grounded in the ADPLL literature cited below. Every block is built **only** from gf180mcu standard cells
 (so it goes through the normal digital flow and is SPICE-characterizable like any cell);
 genuinely analog blocks (LC tank, MOS varactors, current-DAC bias, stochastic/mismatch TDC)
 are intentionally excluded.

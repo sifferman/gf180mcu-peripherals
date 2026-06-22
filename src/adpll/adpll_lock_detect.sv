@@ -49,33 +49,44 @@ module adpll_lock_detect #(
     output wire             lock_o
 );
 
-logic [Width-1:0]                 centre_q;
-logic [$clog2(LockWindows+1)-1:0] in_band_q;
-logic                             lock_q;
+logic [Width-1:0]                 centre_d,  centre_q;
+logic [$clog2(LockWindows+1)-1:0] in_band_d, in_band_q;
+logic                             lock_d,    lock_q;
 
 localparam logic signed [Width+1:0] BandSigned = (Width+2)'(Band);
 wire signed [Width+1:0] band_err = $signed({2'b0, code_i}) - $signed({2'b0, centre_q});
 wire in_band = (band_err >= -BandSigned) && (band_err <= BandSigned);
+
+always_comb begin
+    centre_d  = centre_q;
+    in_band_d = in_band_q;
+    lock_d    = lock_q;
+    if (!enable_i) begin
+        in_band_d = '0;
+        lock_d    = 1'b0;
+    end else if (sample_valid_i) begin
+        if (in_band) begin
+            if (in_band_q == LockWindows[$bits(in_band_q)-1:0])
+                lock_d = 1'b1;
+            else
+                in_band_d = in_band_q + 1'b1;
+        end else begin
+            centre_d  = code_i;
+            in_band_d = '0;
+            lock_d    = 1'b0;
+        end
+    end
+end
 
 always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
         centre_q  <= '0;
         in_band_q <= '0;
         lock_q    <= 1'b0;
-    end else if (!enable_i) begin
-        in_band_q <= '0;
-        lock_q    <= 1'b0;
-    end else if (sample_valid_i) begin
-        if (in_band) begin
-            if (in_band_q == LockWindows[$bits(in_band_q)-1:0])
-                lock_q <= 1'b1;
-            else
-                in_band_q <= in_band_q + 1'b1;
-        end else begin
-            centre_q  <= code_i;
-            in_band_q <= '0;
-            lock_q    <= 1'b0;
-        end
+    end else begin
+        centre_q  <= centre_d;
+        in_band_q <= in_band_d;
+        lock_q    <= lock_d;
     end
 end
 

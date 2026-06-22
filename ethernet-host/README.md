@@ -1,7 +1,7 @@
 # ethernet-host
 
 Host-side tools to drive the chip's Ethernet UDP→memory bridge over plain UDP.
-See `../reference/vivado_nexys/docs/protocol.md` for the wire format.
+The command wire format is documented inline in `dma.py`.
 
 ## Against real hardware
 NIC cabled to the board, host static IP `192.168.1.10/24`:

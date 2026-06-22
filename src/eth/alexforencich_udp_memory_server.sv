@@ -219,7 +219,10 @@ eth_axis_tx eth_axis_tx_inst (
 // checksum generator (a 2048-deep payload FIFO) is not needed.
 // ARP_CACHE_ADDR_WIDTH=2 (4 entries): a test chip talks to ~1 host; the default
 // 512-entry cache was ~41K flip-flops. (Also the wide arp hash; see arp_cache patch.)
-udp_complete #(.UDP_CHECKSUM_GEN_ENABLE(0), .ARP_CACHE_ADDR_WIDTH(2)) udp_complete_inst (
+udp_complete #(
+    .UDP_CHECKSUM_GEN_ENABLE(0),
+    .ARP_CACHE_ADDR_WIDTH   (2)
+) udp_complete_inst (
     .clk(clk_i),
     .rst(rst),
     .s_eth_hdr_valid(rx_eth_hdr_valid),
@@ -375,24 +378,38 @@ udp_command_memory_bridge #(.UdpPort(UdpPort)) bridge_inst (
 // LD0 heartbeat (board alive); LD1..LD4 sticky event latches that localize
 // an RX/TX problem.  Each latch is set in its source clock domain and read
 // asynchronously for the LED (metastability is fine for a light).
-logic [25:0] hb_q = '0;
-always_ff @(posedge clk_i) hb_q <= hb_q + 1'b1;
+logic [25:0] hb_d, hb_q;
+always_comb hb_d = hb_q + 1'b1;
+always_ff @(posedge clk_i) begin
+    if (!rst_ni) hb_q <= '0;
+    else         hb_q <= hb_d;
+end
 
-logic rx_good_sticky_q, rx_drop_sticky_q, tx_good_sticky_q;
+// Sticky event latches: each is set-and-hold (q | event). rx_err_bad_fcs is the RMII-timing
+// tell, synced to clk_i by the MAC FIFO.
+logic rx_good_sticky_d,   rx_good_sticky_q;    // good frame reached the stack
+logic rx_drop_sticky_d,   rx_drop_sticky_q;    // frame dropped
+logic tx_good_sticky_d,   tx_good_sticky_q;    // we sent a good frame
+logic rx_badfcs_sticky_d, rx_badfcs_sticky_q;  // bad FCS seen
+always_comb begin
+    rx_good_sticky_d   = rx_good_sticky_q   | rx_fifo_good_frame;
+    rx_drop_sticky_d   = rx_drop_sticky_q   | rx_fifo_bad_frame;
+    tx_good_sticky_d   = tx_good_sticky_q   | tx_fifo_good_frame;
+    rx_badfcs_sticky_d = rx_badfcs_sticky_q | rx_err_bad_fcs;
+end
 always_ff @(posedge clk_i) begin
     if (!rst_ni) begin
-        rx_good_sticky_q <= 1'b0;
-        rx_drop_sticky_q <= 1'b0;
-        tx_good_sticky_q <= 1'b0;
+        rx_good_sticky_q   <= 1'b0;
+        rx_drop_sticky_q   <= 1'b0;
+        tx_good_sticky_q   <= 1'b0;
+        rx_badfcs_sticky_q <= 1'b0;
     end else begin
-        if (rx_fifo_good_frame) rx_good_sticky_q <= 1'b1;  // good frame reached the stack
-        if (rx_fifo_bad_frame)  rx_drop_sticky_q <= 1'b1;  // frame dropped
-        if (tx_fifo_good_frame) tx_good_sticky_q <= 1'b1;  // we sent a good frame
+        rx_good_sticky_q   <= rx_good_sticky_d;
+        rx_drop_sticky_q   <= rx_drop_sticky_d;
+        tx_good_sticky_q   <= tx_good_sticky_d;
+        rx_badfcs_sticky_q <= rx_badfcs_sticky_d;
     end
 end
-// bad FCS (the RMII-timing tell); rx_err_bad_fcs is synced to clk_i by the MAC FIFO
-logic rx_badfcs_sticky_q = 1'b0;
-always_ff @(posedge clk_i) if (rx_err_bad_fcs) rx_badfcs_sticky_q <= 1'b1;
 
 // LD0 heartbeat | LD1 good RX | LD2 bad-FCS RX | LD3 dropped RX | LD4 good TX
 assign led_o = {3'b0, tx_good_sticky_q, rx_drop_sticky_q, rx_badfcs_sticky_q,

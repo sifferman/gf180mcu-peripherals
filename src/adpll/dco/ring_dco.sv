@@ -97,9 +97,15 @@ for (genvar i_GEN = 0; i_GEN < NumTuneBits; i_GEN++) begin : delay_segment
     assign d[0] = node[i_GEN];
     for (genvar j_GEN = 0; j_GEN < NumStages; j_GEN++) begin : inverter_pair
         (* keep *) (* dont_touch = "true" *)
-        gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_a (.A (d[2*j_GEN]),     .Y (d[2*j_GEN + 1]));
+        gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_a (
+            .A (d[2*j_GEN]),
+            .Y (d[2*j_GEN + 1])
+        );
         (* keep *) (* dont_touch = "true" *)
-        gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_b (.A (d[2*j_GEN + 1]), .Y (d[2*j_GEN + 2]));
+        gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_b (
+            .A (d[2*j_GEN + 1]),
+            .Y (d[2*j_GEN + 2])
+        );
     end
     (* keep *) (* dont_touch = "true" *)
     gf180mcu_as_sc_mcu7t3v3__mux2_2 u_sel (

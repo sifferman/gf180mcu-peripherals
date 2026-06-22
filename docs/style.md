@@ -1,9 +1,7 @@
 # STYLE.md
 
-The lowRISC style guide
-([references/lowRISC-style-guide/VerilogCodingStyle.md](references/lowRISC-style-guide/VerilogCodingStyle.md))
-is the official reference. Everything below is either an excerpt, an
-emphasis, or a project-specific rule.
+The lowRISC Verilog Coding Style guide is the official reference.
+Everything below is either an excerpt, an emphasis, or a project-specific rule.
 
 ## Names
 
@@ -22,6 +20,14 @@ emphasis, or a project-specific rule.
   lowRISC: if a signal is also active-low or a module port, suffix order
   is `_n` → `_d`/`_q` → `_i`/`_o`/`_io` (e.g. `rst_ni`). Pipelined copies
   are `_q2`, `_q3`, etc.
+- **`always_ff` holds only the reset and `_q <= _d`.** No combinational
+  logic in a clocked block — all next-state computation (enables/holds,
+  arithmetic, muxing, increments) goes in `always_comb` or continuous
+  `assign`s that drive `_d` (or an `_o`). An `always_ff` is exactly
+  `if (!rst_ni) _q <= <reset>; else _q <= _d;`. An enable becomes part of
+  `_d` (`_d = en ? next : _q`), never `if (en) _q <= …` in the `always_ff`.
+  (The one pragmatic exception is a RAM write port — a memory array has no
+  `_d` shadow, so `if (we) mem[addr] <= wdata` stays in the `always_ff`.)
 
 ## Modules
 
@@ -44,11 +50,22 @@ emphasis, or a project-specific rule.
    ~10 lines of always_ff and an assign. No module needed.
 3. **Add a new module** — LAST RESORT. Check `third_party/` again first.
 
+## Instantiation
+
+- **One parameter/port connection per line.** Every `.name(value)` port
+  connection — and every `#(.PARAM(value))` override — goes on its own line,
+  even for a two-pin cell. Keeps diffs minimal and every connection greppable.
+  Use named connections (`.port(sig)`); the `.clk_i` implicit-connect shorthand
+  (`.clk_i(clk_i)`) is fine, one per line.
+
 ## Anti-patterns to avoid
 
 - **Don't add comments that restate what the code does**. Comments are
   for *why* and for surprising invariants. If you need a comment to
   explain *what*, the names are bad — fix the names.
+- Don't put combinational logic in always_ff blocks. Combinational logic
+  should only exist in always_comb and assign blocks were _o/_d values are assigned.
+  In always_ff blocks, the only logic should be the reset and _q<=_d.
 
 ## Pure functions and constants
 

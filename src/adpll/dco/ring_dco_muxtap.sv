@@ -71,9 +71,15 @@ assign tap[0] = node0;
 for (genvar k_GEN = 1; k_GEN < NumTaps; k_GEN++) begin : tap_chain
     wire mid;
     (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_a (.A (tap[k_GEN-1]), .Y (mid));
+    gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_a (
+        .A (tap[k_GEN-1]),
+        .Y (mid)
+    );
     (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_b (.A (mid),          .Y (tap[k_GEN]));
+    gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_b (
+        .A (mid),
+        .Y (tap[k_GEN])
+    );
 end
 
 // Binary mux tree: level L is selected by tune_i[L-1]; output of the top level is the

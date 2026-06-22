@@ -151,8 +151,11 @@ always_comb begin
     mem_read_ready    = (state_q == S_RWAIT);
 end
 
-m_axil_readwrite #(.AddrWidth(32)) u_mem (
-    .clk_i, .rst_ni(rst_ni),
+m_axil_readwrite #(
+    .AddrWidth(32)
+) u_mem (
+    .clk_i,
+    .rst_ni,
     .request_valid_i(mem_request_valid),
     .request_ready_o(mem_request_ready),
     .request_write_not_read_i(mem_request_write),

@@ -79,9 +79,15 @@ gf180mcu_as_sc_mcu7t3v3__nand2_2 u_gate (
 for (genvar k_GEN = 0; k_GEN < NumUnits; k_GEN++) begin : delay_unit
     wire mid, delayed;
     (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_a (.A (node[k_GEN]), .Y (mid));
+    gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_a (
+        .A (node[k_GEN]),
+        .Y (mid)
+    );
     (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_b (.A (mid),         .Y (delayed));
+    gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_b (
+        .A (mid),
+        .Y (delayed)
+    );
     // Insert this unit's delay when its thermometer bit is set, else bypass.
     (* keep *) (* dont_touch = "true" *)
     gf180mcu_as_sc_mcu7t3v3__mux2_2 u_sel (

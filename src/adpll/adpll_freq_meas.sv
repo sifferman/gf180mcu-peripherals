@@ -68,38 +68,61 @@ function automatic logic [CountWidth-1:0] gray2bin(input logic [CountWidth-1:0] 
 endfunction
 
 // DCO domain: Gray-coded free-running edge counter (async reset; clock is gated).
-logic [CountWidth-1:0] dco_cnt_bin_q;
-logic [CountWidth-1:0] dco_cnt_gray_q;
+logic [CountWidth-1:0] dco_cnt_bin_d,  dco_cnt_bin_q;
+logic [CountWidth-1:0] dco_cnt_gray_d, dco_cnt_gray_q;
+always_comb dco_cnt_bin_d  = dco_cnt_bin_q + 1'b1;
+always_comb dco_cnt_gray_d = bin2gray(dco_cnt_bin_d);
 always_ff @(posedge dco_clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
         dco_cnt_bin_q  <= '0;
         dco_cnt_gray_q <= '0;
     end else begin
-        dco_cnt_bin_q  <= dco_cnt_bin_q + 1'b1;
-        dco_cnt_gray_q <= bin2gray(dco_cnt_bin_q + 1'b1);
+        dco_cnt_bin_q  <= dco_cnt_bin_d;
+        dco_cnt_gray_q <= dco_cnt_gray_d;
     end
 end
 
-// Reference domain: synchronize the Gray count.
-logic [CountWidth-1:0] gray_sync0_q, gray_sync1_q;
+// Reference domain: two-flop Gray synchronizer.
+logic [CountWidth-1:0] gray_sync0_d, gray_sync0_q;
+logic [CountWidth-1:0] gray_sync1_d, gray_sync1_q;
+always_comb begin
+    gray_sync0_d = dco_cnt_gray_q;
+    gray_sync1_d = gray_sync0_q;
+end
 always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
         gray_sync0_q <= '0;
         gray_sync1_q <= '0;
     end else begin
-        gray_sync0_q <= dco_cnt_gray_q;
-        gray_sync1_q <= gray_sync0_q;
+        gray_sync0_q <= gray_sync0_d;
+        gray_sync1_q <= gray_sync1_d;
     end
 end
 wire [CountWidth-1:0] dco_cnt_sync = gray2bin(gray_sync1_q);
 
 // Programmable measurement window: a clk_i counter that rolls over every div_i cycles.
-logic [DivWidth-1:0]   window_cnt_q;
 wire window_tick = (window_cnt_q >= div_i - 1'b1);
 
-logic [CountWidth-1:0] cnt_at_window_q;   // edge count snapshot at the last window edge
-logic [CountWidth-1:0] measured_q;
-logic                  sample_valid_q;
+logic [DivWidth-1:0]   window_cnt_d,    window_cnt_q;
+logic [CountWidth-1:0] cnt_at_window_d, cnt_at_window_q;  // edge-count snapshot at window edge
+logic [CountWidth-1:0] measured_d,      measured_q;
+logic                  sample_valid_d,  sample_valid_q;
+
+always_comb begin
+    window_cnt_d    = window_cnt_q + 1'b1;
+    cnt_at_window_d = cnt_at_window_q;
+    measured_d      = measured_q;
+    sample_valid_d  = 1'b0;
+    if (!enable_i) begin
+        window_cnt_d    = '0;
+        cnt_at_window_d = dco_cnt_sync;
+    end else if (window_tick) begin
+        window_cnt_d    = '0;
+        cnt_at_window_d = dco_cnt_sync;
+        measured_d      = dco_cnt_sync - cnt_at_window_q;
+        sample_valid_d  = 1'b1;
+    end
+end
 
 always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
@@ -107,18 +130,11 @@ always_ff @(posedge clk_i or negedge rst_ni) begin
         cnt_at_window_q <= '0;
         measured_q      <= '0;
         sample_valid_q  <= 1'b0;
-    end else if (!enable_i) begin
-        window_cnt_q    <= '0;
-        cnt_at_window_q <= dco_cnt_sync;
-        sample_valid_q  <= 1'b0;
-    end else if (window_tick) begin
-        window_cnt_q    <= '0;
-        cnt_at_window_q <= dco_cnt_sync;
-        measured_q      <= dco_cnt_sync - cnt_at_window_q;
-        sample_valid_q  <= 1'b1;
     end else begin
-        window_cnt_q    <= window_cnt_q + 1'b1;
-        sample_valid_q  <= 1'b0;
+        window_cnt_q    <= window_cnt_d;
+        cnt_at_window_q <= cnt_at_window_d;
+        measured_q      <= measured_d;
+        sample_valid_q  <= sample_valid_d;
     end
 end
 

@@ -88,9 +88,17 @@ module adpll_ctrl #(
 wire [CountWidth-1:0] measured;
 wire                  sample_valid;
 
-adpll_freq_meas #(.CountWidth(CountWidth), .DivWidth(DivWidth)) u_meas (
-    .clk_i, .rst_ni, .enable_i, .div_i, .dco_clk_i,
-    .measured_o(measured), .sample_valid_o(sample_valid)
+adpll_freq_meas #(
+    .CountWidth(CountWidth),
+    .DivWidth  (DivWidth)
+) u_meas (
+    .clk_i,
+    .rst_ni,
+    .enable_i,
+    .div_i,
+    .dco_clk_i,
+    .measured_o    (measured),
+    .sample_valid_o(sample_valid)
 );
 
 wire too_fast = measured > mul_i;   // freq high => add delay  => raise tune
@@ -107,27 +115,44 @@ function automatic logic [NumTuneBits-1:0] clamp(input int v);
     else                        clamp = NumTuneBits'(v);
 endfunction
 
-// PI loop filter, combinational next-state. dir is the 1-bit (sign) error.
-wire signed [1:0]      dir     = too_fast ? 2'sd1 : (too_slow ? -2'sd1 : 2'sd0);
-wire [NumTuneBits-1:0] integ_d = clamp(int'(integ_q) + dir * int'(IntegralGain));
-wire [NumTuneBits-1:0] tune_d  = clamp(int'(integ_d) + dir * int'(ProportionalGain));
+// PI loop filter. dir is the 1-bit (sign) error; *_step is the next code on a sample.
+wire signed [1:0]      dir         = too_fast ? 2'sd1 : (too_slow ? -2'sd1 : 2'sd0);
+wire [NumTuneBits-1:0] integ_step  = clamp(int'(integ_q)    + dir * int'(IntegralGain));
+wire [NumTuneBits-1:0] tune_step   = clamp(int'(integ_step) + dir * int'(ProportionalGain));
+
+// Update only on a fresh measurement; the gating lives here in _d, not in the always_ff.
+logic [NumTuneBits-1:0] integ_d, tune_d;
+always_comb begin
+    integ_d = integ_q;
+    tune_d  = tune_q;
+    if (enable_i && sample_valid) begin
+        integ_d = integ_step;
+        tune_d  = tune_step;
+    end
+end
 
 always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
         integ_q <= {NumTuneBits{1'b0}};
         tune_q  <= {NumTuneBits{1'b0}};
-    end else if (enable_i && sample_valid) begin
+    end else begin
         integ_q <= integ_d;
         tune_q  <= tune_d;
     end
 end
 
 // Lock on the integral operating point (the clean code, not the +-1 LSB limit cycle).
-adpll_lock_detect #(.Width(NumTuneBits), .LockWindows(LockWindows), .Band(1)) u_lock (
-    .clk_i, .rst_ni, .enable_i,
+adpll_lock_detect #(
+    .Width      (NumTuneBits),
+    .LockWindows(LockWindows),
+    .Band       (1)
+) u_lock (
+    .clk_i,
+    .rst_ni,
+    .enable_i,
     .sample_valid_i(sample_valid),
-    .code_i(integ_q),
-    .lock_o(lock_o)
+    .code_i        (integ_q),
+    .lock_o        (lock_o)
 );
 
 assign tune_o = tune_q;

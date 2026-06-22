@@ -12,13 +12,14 @@ It integrates four peripherals on a shared on-chip AXI fabric driven over Ethern
 | **Digital ring-oscillator PLL** (mux-chain DCO) | this repo | WIP |
 
 A host PC writes/reads on-chip memory over plain UDP (no soft CPU) — a hardware state machine
-turns UDP commands into AXI reads/writes. See `reference/vivado_nexys/docs/protocol.md`.
+turns UDP commands into AXI reads/writes (the command wire format is documented in
+`ethernet-host/dma.py`).
 
 ## Layout
 
 ```
 src/            chip_top (pads), chip_core (integration), and reusable blocks:
-  eth/          UDP→memory datapath (ported from reference/vivado_nexys)
+  eth/          UDP→memory datapath
   axi/          AXI4-Lite RAM (on-chip gold-path target)
   sdram/ sdcard/ dpll/ csr/   (per-peripheral, WIP)
 third_party/    vendored submodules (verilog-ethernet, core_sdram_axi4, SD reader, cocotbext-eth)

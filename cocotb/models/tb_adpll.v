@@ -50,6 +50,22 @@ module tb_adpll;
   );
 
   integer cycles = 0, enable_cycle = 0;
+
+`ifdef TRACE
+  // Log every tune transition (cycle-since-enable, code) so the acquisition
+  // trajectory can be plotted -- bang-bang's +-1 LSB staircase vs the linear
+  // loop's smooth integral approach. Sim-only; gated by -DTRACE.
+  reg [NUM_TUNE-1:0] tune_prev = {NUM_TUNE{1'b1}};
+  reg                trace_started = 1'b0;
+  always @(posedge clk) if (enable) begin
+    if (!trace_started || tune !== tune_prev) begin
+      $display("TRACE %0d %0d", cycles - enable_cycle, tune);
+      tune_prev     = tune;
+      trace_started = 1'b1;
+    end
+  end
+`endif
+
   always @(posedge clk) begin
     cycles = cycles + 1;
     if (lock) begin

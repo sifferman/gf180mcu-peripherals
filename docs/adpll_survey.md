@@ -85,30 +85,52 @@ filter consists of a proportional path with a gain α and an integral path with 
 
 | controller | settled tune | lock time (ref cycles) | notes |
 |---|---|---|---|
-| bang-bang PI | 21 | 7937 | no gain matching; clean ±1 LSB limit cycle |
-| linear PI | 20 | 4609 | faster + exact, **but** required a tiny proportional gain (`AlphaShift=10`) — a larger α slams tune to a rail and oscillates rail-to-rail on a coarse DCO (huge cold-start error) |
+| bang-bang PI | 21 | 7938 | no gain matching; clean ±1 LSB limit cycle |
+| linear PI | 20 | 4610 | faster + exact, **but** required a tiny proportional gain (`AlphaShift=10`) — a larger α slams tune to a rail and oscillates rail-to-rail on a coarse DCO (huge cold-start error) |
 
-Finding: the linear PI is faster and more accurate *once gains are matched to K_DCO*, but on
-a coarse DCO it needs that care (small α / integral-dominant acquisition); the bang-bang
+![Controller acquisition trajectory](figures/ctrl_trajectory.png)
+
+The acquisition trajectory (above, `-DTRACE`) makes the difference visual: the bang-bang loop
+steps ±1 LSB/window — a slow staircase that then hunts in a ±1 LSB limit cycle around the
+target — while the linear loop slews proportionally to the error and settles in ~58 % of the
+time. Finding: the linear PI is faster and more accurate *once gains are matched to K_DCO*, but
+on a coarse DCO it needs that care (small α / integral-dominant acquisition); the bang-bang
 needs none and is inherently PVT-robust — which is why bang-bang dominates coarse ADPLLs.
 
 ### DCO across PVT corners — `make dco-spice-corners` (ngspice ≥ 42, `ring_dco`, 7-bit)
 
+Fine code sweep (raw data in `figures/corner_*.dat`):
+
 | code | SS (ss/3.0 V/125 °C) | TT (typ/3.3 V/25 °C) | FF (ff/3.6 V/−40 °C) |
 |---|---|---|---|
-| 0 (fastest) | 209.5 MHz | 338.5 MHz | 499.6 MHz |
-| 64 | 146.3 | 226.9 | 327.6 |
-| 127 | 215.6 ⚠ | 221.9 | 244.6 |
+| 0 (fastest)  | 209.5 MHz | 338.5 MHz | 499.6 MHz |
+| 8            | 149.0 | 239.0 | 349.8 |
+| 16           | 115.3 | 184.4 | 268.8 |
+| 24 (slowest usable) | 94.3 | 150.3 | 218.5 |
+| 32           | 242.1 ⚠ | 384.8 ⚠ | 549.9 ⚠ |
+| 64           | 146.3 ⚠ | 226.9 ⚠ | 327.6 ⚠ |
+| 127          | 215.6 ⚠ | 221.9 ⚠ | 244.6 ⚠ |
+
+⚠ = multi-mode (non-monotonic): code ≥ 32 the measured fundamental folds back up.
+
+![DCO frequency vs. code, by corner](figures/dco_freq_vs_code.png)
+![Per-corner reachable frequency envelope](figures/dco_pvt_envelope.png)
+
+**Min / max DCO frequency:** global max = **499.6 MHz** (FF, code 0); global min usable =
+**94.3 MHz** (SS, code 24). Per corner the usable (monotonic, codes 0–24) band is SS 94–210,
+TT 150–338, FF 219–500 MHz.
 
 Findings (confirming the textbook):
-1. **~2.4× PVT spread** at a fixed code (209→500 MHz) — Staszewski's "highly nonlinear
-   frequency vs. voltage." This is why an open-loop frequency setting is impossible and a
-   closed loop with programmable `mul/div` is required.
-2. **No single fixed target is reachable at every corner**: FF's slowest setting (code 127,
-   244 MHz) is above SS's fastest (code 0, 210 MHz). The programmable `mul/div` (chosen
-   per-chip after sensing the corner) is what makes "works at all corners" achievable — the
-   loop locks to whatever ratio is reachable at the actual silicon corner.
-3. **High codes go multi-mode** (SS: code 127 reads 215 MHz > code 64's 146 MHz, non-monotonic):
-   a long ring sustains multiple circulating waves. Usable monotonic range is the low codes.
+1. **~2.4× PVT spread** at a fixed code (e.g. code 0: 209→500 MHz) — Staszewski's "highly
+   nonlinear frequency vs. voltage." Open-loop frequency setting is impossible; a closed loop
+   with programmable `mul/div` is required.
+2. **No single fixed target is reachable at every corner**: the usable bands barely miss
+   overlapping — SS tops out at 209.5 MHz (code 0) while FF bottoms at 218.5 MHz (code 24).
+   The programmable `mul/div` (chosen per-chip after sensing the corner) is what makes "works
+   at all corners" achievable — the loop locks to whatever ratio is reachable at the actual
+   silicon corner.
+3. **High codes go multi-mode** (code ≥ 32 reads *higher* than code 24, non-monotonic): a long
+   ring sustains multiple circulating waves. Usable monotonic range is codes 0–24.
 
-Corner sims are run regularly via `make dco-spice-corners` as the design evolves.
+Corner sims are run regularly via `make dco-spice-corners` as the design evolves; the figures
+are regenerated with `src/adpll/dco/plot_pll.py`.

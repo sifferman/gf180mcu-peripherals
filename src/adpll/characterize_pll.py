@@ -42,7 +42,7 @@ class LockDetect:
 def run_loop(freq_of_code, bits, ctrl, mul, div, ref_ns, max_windows=4000, post_lock=40):
     """One window = div reference cycles; measured = DCO edges in a window = f * div * Tref,
     using the tune that was ACTIVE during that window (one-window measurement latency, as in
-    the RTL freq_meas). Free-runs `post_lock` windows after lock so steady-state jitter is the
+    the RTL adpll_freq_counter). Free-runs `post_lock` windows after lock so steady-state jitter is the
     settled limit-cycle spread, not the acquisition tail."""
     tune_max = (1 << bits) - 1
     window_s = div * ref_ns * 1e-9

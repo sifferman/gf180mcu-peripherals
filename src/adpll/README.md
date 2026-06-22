@@ -17,8 +17,8 @@ variant survey, the citations, and the simulation results live in
 ## Layout
 
 ```
-adpll_freq_counter.sv     shared: Gray-CDC DCO-edge counter over a runtime div_i-cycle window
-adpll_lock_detect.sv   shared: code-band lock detector
+adpll_freq_counter.sv     shared: Gray-CDC DCO-edge counter over a runtime-length measurement window
+adpll_lock_detect.sv   shared: lock detector (tuning sample stays in-band for MinSamplesForLock)
 adpll_controller_bangbang.sv          controller: bang-bang PI loop filter (1-bit/sign error)
 adpll_controller_linear.sv   controller: linear PI loop filter (multi-bit error, power-of-two gains)
 dco/

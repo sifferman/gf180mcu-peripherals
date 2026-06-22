@@ -74,7 +74,7 @@ function automatic logic [EdgeCountWidth-1:0] gray2bin(logic [EdgeCountWidth-1:0
         gray2bin = gray2bin ^ (g >> i);
 endfunction
 
-// DCO domain: free-running edge counter, with a Gray-coded copy for the clock crossing
+// DCO domain: continuously-running edge counter, with a Gray-coded copy for the clock crossing
 // (one bit changes per edge, so it survives the two-flop synchronizer below).
 logic [EdgeCountWidth-1:0] continuous_dco_edge_count_binary_d, continuous_dco_edge_count_binary_q;
 logic [EdgeCountWidth-1:0] continuous_dco_edge_count_gray_d,   continuous_dco_edge_count_gray_q;
@@ -90,19 +90,19 @@ always_ff @(posedge dco_clk_i or negedge rst_ni) begin
     end
 end
 
-// Reference domain: two-flop Gray synchronizer (gray_sync_q1 may be metastable; gray_sync_q2 is settled).
-logic [EdgeCountWidth-1:0] gray_sync_q1, gray_sync_q2;
+// Reference domain: two-flop Gray synchronizer (continuous_dco_edge_count_gray_sync_q1 may be metastable; continuous_dco_edge_count_gray_sync_q2 is settled).
+logic [EdgeCountWidth-1:0] continuous_dco_edge_count_gray_sync_q1, continuous_dco_edge_count_gray_sync_q2;
 always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-        gray_sync_q1 <= '0;
-        gray_sync_q2 <= '0;
+        continuous_dco_edge_count_gray_sync_q1 <= '0;
+        continuous_dco_edge_count_gray_sync_q2 <= '0;
     end else begin
-        gray_sync_q1 <= continuous_dco_edge_count_gray_q;   // CDC capture from the DCO domain
-        gray_sync_q2 <= gray_sync_q1;            // settle
+        continuous_dco_edge_count_gray_sync_q1 <= continuous_dco_edge_count_gray_q;         // CDC capture from the DCO domain
+        continuous_dco_edge_count_gray_sync_q2 <= continuous_dco_edge_count_gray_sync_q1;   // settle
     end
 end
 logic [EdgeCountWidth-1:0] continuous_dco_edge_count_sync;
-always_comb continuous_dco_edge_count_sync = gray2bin(gray_sync_q2);
+always_comb continuous_dco_edge_count_sync = gray2bin(continuous_dco_edge_count_gray_sync_q2);
 
 
 // ================================================== //

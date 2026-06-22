@@ -86,3 +86,33 @@ src/patches override and restore the true CRC hash):
     bumping only yosys-slang does nothing; the fix is in slang).
 See also the pre-compute path below — generating a const-folded `lfsr.v` (masks baked in) lets
 stock yosys build it without slang and without the hash deviation.
+
+## ADPLL integration into chip_core (2026-06-22, autonomous)
+
+Wired the standalone ADPLL into the chip (was designed/simulated but disconnected).
+Decisions taken (sensible defaults, no blocker — flag at review if any should change):
+  * **Controller variant in-chip: bang-bang `adpll_ctrl`** (not the linear sibling). The survey
+    shows bang-bang needs no K_DCO gain matching and is inherently PVT-robust on a coarse ring;
+    the linear loop locks faster but needs a tuned small alpha. Bang-bang is the safer silicon default.
+  * **DCO: `ring_dco`** (binary-weighted), 7-bit — the SPICE-characterized variant.
+  * **Fabric: nested split.** Added a top `axil_interconnect` on `addr[29]`: low -> existing
+    RAM/SDRAM 2-way (addresses UNCHANGED: RAM 0x0, SDRAM 0x1000_0000), high -> new `adpll_csr`
+    at **0x2000_0000**. Reuses the proven 2-way module; host/sim addresses unaffected.
+  * **CSR map** (`src/csr/adpll_csr.sv`): 0x0 CTRL[0]=enable, 0x4 MUL(N), 0x8 DIV(M),
+    0xC STATUS (ro: [0]=lock, [NumTuneBits:1]=tune). Observe-only: DCO clk -> analog[0], lock -> analog[1].
+  * Reference is the 50 MHz core clock (mul/div synthesizer); no separate pll_in pad.
+
+Sim-validated: `make sim-adpll-csr` (program over AXI4-Lite, poll STATUS -> lock, tune=21) PASS;
+full `chip_top_tb` PASS (eth datapath unaffected, ADPLL disabled at reset). Also fixed a latent
+forward-reference in adpll_freq_meas.sv (window_tick used window_cnt_q before its declaration —
+Icarus tolerated it standalone but not in the full elaboration; moved the wire below the decls).
+
+**OPEN — M3 harden risk (not yet resolved):** the ring DCO is a combinational oscillator and
+its output `dco_clk` clocks the freq-measure counter, i.e. a second (free-running, async) clock
+domain now exists in the core. The current SDC defines only the 50 MHz core clock; there is no
+`create_clock` for `dco_clk` and no false-path/loop-break for the ring. OpenROAD will auto-break
+the comb loop, but `dco_clk`-domain flops are effectively unconstrained and CTS/STA handling is
+unverified. The clean fix is SDC work: declare `dco_clk` as a clock (or set the ring feedback as
+a false path) + keep the (* keep *)/dont_touch on the ring cells. M2 (Ethernet+SDRAM, no ADPLL)
+hardens clean today; M3 (with ADPLL) harden is attempted next and the outcome will be reported
+rather than assumed.

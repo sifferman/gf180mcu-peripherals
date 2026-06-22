@@ -101,12 +101,12 @@ end
 wire [CountWidth-1:0] dco_cnt_sync = gray2bin(gray_sync1_q);
 
 // Programmable measurement window: a clk_i counter that rolls over every div_i cycles.
-wire window_tick = (window_cnt_q >= div_i - 1'b1);
-
 logic [DivWidth-1:0]   window_cnt_d,    window_cnt_q;
 logic [CountWidth-1:0] cnt_at_window_d, cnt_at_window_q;  // edge-count snapshot at window edge
 logic [CountWidth-1:0] measured_d,      measured_q;
 logic                  sample_valid_d,  sample_valid_q;
+
+wire window_tick = (window_cnt_q >= div_i - 1'b1);
 
 always_comb begin
     window_cnt_d    = window_cnt_q + 1'b1;

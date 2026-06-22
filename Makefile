@@ -156,6 +156,14 @@ sim-adpll: ## Standalone digital ADPLL test: ring DCO (behavioural) + FLL lock (
 	vvp cocotb/sim_build/tb_adpll
 .PHONY: sim-adpll
 
+sim-adpll-csr: ## Integrated ADPLL: program mul/div/enable over AXI4-Lite CSR, poll STATUS for lock (iverilog)
+	mkdir -p cocotb/sim_build
+	iverilog -g2012 -o cocotb/sim_build/tb_adpll_csr \
+		src/csr/adpll_csr.sv src/adpll/adpll_ctrl.sv src/adpll/adpll_freq_meas.sv \
+		src/adpll/adpll_lock_detect.sv src/adpll/dco/ring_dco.sv cocotb/models/tb_adpll_csr.v
+	vvp cocotb/sim_build/tb_adpll_csr | grep -E "CSR programmed|LOCKED|PASS|FAIL"
+.PHONY: sim-adpll-csr
+
 sim-adpll-survey: ## Compare the ADPLL controller variants (bang-bang PI vs linear PI): lock time + code
 	@mkdir -p cocotb/sim_build
 	@for ctrl in "bang-bang:" "linear:-DCTRL_LINEAR"; do \

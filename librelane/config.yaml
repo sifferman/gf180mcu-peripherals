@@ -80,6 +80,12 @@ VERILOG_FILES:
 - dir::../third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi_core.v
 - dir::../third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi_pmem.v
 - dir::../src/sdram/sdram_wrap.sv
+# ADPLL (CSR + bang-bang controller + ring DCO; observe-only, DCO preserved via (* keep *)/dont_touch)
+- dir::../src/csr/adpll_csr.sv
+- dir::../src/adpll/adpll_freq_meas.sv
+- dir::../src/adpll/adpll_lock_detect.sv
+- dir::../src/adpll/adpll_ctrl.sv
+- dir::../src/adpll/dco/ring_dco.sv
 # Top + core
 - dir::../src/chip_core.sv
 - dir::../src/chip_top.sv

@@ -221,6 +221,11 @@ def chip_top_runner():
         sources.append(PROJ / "../src/axi/axil_to_axi4.sv")
         sources.append(PROJ / "../src/axi/axil_interconnect.sv")
         sources.append(PROJ / "../src/sdram/sdram_wrap.sv")
+        sources.append(PROJ / "../src/csr/adpll_csr.sv")
+        sources.append(PROJ / "../src/adpll/adpll_freq_meas.sv")
+        sources.append(PROJ / "../src/adpll/adpll_lock_detect.sv")
+        sources.append(PROJ / "../src/adpll/adpll_ctrl.sv")
+        sources.append(PROJ / "../src/adpll/dco/ring_dco.sv")
         _sdc = PROJ / "../third_party/ultraembedded_axi_sdram_controller/src_v"
         sources += [_sdc / "sdram_axi.v", _sdc / "sdram_axi_core.v", _sdc / "sdram_axi_pmem.v"]
         # verilog-ethernet: only modules reachable from chip_top

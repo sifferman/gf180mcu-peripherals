@@ -26,12 +26,17 @@
 
 // chip_core
 //
-// Peripheral integration (M2: Ethernet + SDRAM). The RMII MAC + UDP stack exposes a
-// UDP->memory AXI4-Lite master; an interconnect routes it by address to slave 0
-// (addr[28]=0, on-chip scratch RAM) or slave 1 (addr[28]=1, external SDRAM via
-// sdram_wrap). A host therefore writes/reads SDRAM over plain UDP. Single 50 MHz domain
-// (clk = clk_PAD, forwarded to the PHY as the RMII reference clock). The clk/rst_n and
-// pad-vector ports are the wafer.space slot template's chip_core contract.
+// Peripheral integration (Ethernet + SDRAM + ADPLL). The RMII MAC + UDP stack exposes a
+// UDP->memory AXI4-Lite master. A top split on addr[29] routes it to the memory subsystem
+// (low region) or the ADPLL CSR (high region, 0x2000_0000). The memory subsystem decodes
+// addr[28] to slave 0 (on-chip scratch RAM, 0x0) or slave 1 (external SDRAM via sdram_wrap,
+// 0x1000_0000), so a host writes/reads SDRAM over plain UDP. The ADPLL is observe-only:
+// its CSR sets enable/mul/div, and the DCO clock + lock go to the analog pads. Single 50 MHz
+// core domain (clk = clk_PAD, forwarded to the PHY as the RMII reference clock); the DCO runs
+// in its own free-running domain and does not clock the core. The clk/rst_n and pad-vector
+// ports are the wafer.space slot template's chip_core contract.
+//
+// Address map (over Ethernet): 0x0000_0000 scratch RAM · 0x1000_0000 SDRAM · 0x2000_0000 ADPLL CSR.
 //
 // Pad map (1x1 slot, retyped to NUM_BIDIR=47 / NUM_INPUT=5):
 //   input_in[0]=rmii_crs_dv [1]=rmii_rx_er [2]=rmii_rxd0 [3]=rmii_rxd1 [4]=mode_strap
@@ -120,26 +125,27 @@ alexforencich_udp_memory_server #(
     .led_o(led)
 );
 
-// Interconnect: master -> {slave 0 scratch RAM, slave 1 SDRAM}
-wire [31:0] ram_axil_awaddr, ram_axil_wdata, ram_axil_araddr, ram_axil_rdata;
-wire [2:0]  ram_axil_awprot, ram_axil_arprot;
-wire [3:0]  ram_axil_wstrb;
-wire [1:0]  ram_axil_bresp, ram_axil_rresp;
-wire        ram_axil_awvalid, ram_axil_awready, ram_axil_wvalid, ram_axil_wready,
-            ram_axil_bvalid, ram_axil_bready, ram_axil_arvalid, ram_axil_arready,
-            ram_axil_rvalid, ram_axil_rready;
+// Top split (addr[29]): low region -> RAM/SDRAM subsystem, high region (0x2000_0000) -> ADPLL CSR.
+// RAM (0x0) and SDRAM (0x1000_0000) keep addr[29]=0, so their addresses are unchanged.
+wire [31:0] mem_axil_awaddr, mem_axil_wdata, mem_axil_araddr, mem_axil_rdata;
+wire [2:0]  mem_axil_awprot, mem_axil_arprot;
+wire [3:0]  mem_axil_wstrb;
+wire [1:0]  mem_axil_bresp, mem_axil_rresp;
+wire        mem_axil_awvalid, mem_axil_awready, mem_axil_wvalid, mem_axil_wready,
+            mem_axil_bvalid, mem_axil_bready, mem_axil_arvalid, mem_axil_arready,
+            mem_axil_rvalid, mem_axil_rready;
 
-wire [31:0] sdram_axil_awaddr, sdram_axil_wdata, sdram_axil_araddr, sdram_axil_rdata;
-wire [2:0]  sdram_axil_awprot, sdram_axil_arprot;
-wire [3:0]  sdram_axil_wstrb;
-wire [1:0]  sdram_axil_bresp, sdram_axil_rresp;
-wire        sdram_axil_awvalid, sdram_axil_awready, sdram_axil_wvalid, sdram_axil_wready,
-            sdram_axil_bvalid, sdram_axil_bready, sdram_axil_arvalid, sdram_axil_arready,
-            sdram_axil_rvalid, sdram_axil_rready;
+wire [31:0] csr_axil_awaddr, csr_axil_wdata, csr_axil_araddr, csr_axil_rdata;
+wire [2:0]  csr_axil_awprot, csr_axil_arprot;
+wire [3:0]  csr_axil_wstrb;
+wire [1:0]  csr_axil_bresp, csr_axil_rresp;
+wire        csr_axil_awvalid, csr_axil_awready, csr_axil_wvalid, csr_axil_wready,
+            csr_axil_bvalid, csr_axil_bready, csr_axil_arvalid, csr_axil_arready,
+            csr_axil_rvalid, csr_axil_rready;
 
 axil_interconnect #(
-    .SelBit(28)
-) i_ic (
+    .SelBit(29)
+) i_ic_top (
     .s_axil_awaddr (eth_axil_awaddr),
     .s_axil_awprot (eth_axil_awprot),
     .s_axil_awvalid(eth_axil_awvalid),
@@ -159,6 +165,85 @@ axil_interconnect #(
     .s_axil_rresp  (eth_axil_rresp),
     .s_axil_rvalid (eth_axil_rvalid),
     .s_axil_rready (eth_axil_rready),
+    .m0_axil_awaddr (mem_axil_awaddr),
+    .m0_axil_awprot (mem_axil_awprot),
+    .m0_axil_awvalid(mem_axil_awvalid),
+    .m0_axil_awready(mem_axil_awready),
+    .m0_axil_wdata  (mem_axil_wdata),
+    .m0_axil_wstrb  (mem_axil_wstrb),
+    .m0_axil_wvalid (mem_axil_wvalid),
+    .m0_axil_wready (mem_axil_wready),
+    .m0_axil_bresp  (mem_axil_bresp),
+    .m0_axil_bvalid (mem_axil_bvalid),
+    .m0_axil_bready (mem_axil_bready),
+    .m0_axil_araddr (mem_axil_araddr),
+    .m0_axil_arprot (mem_axil_arprot),
+    .m0_axil_arvalid(mem_axil_arvalid),
+    .m0_axil_arready(mem_axil_arready),
+    .m0_axil_rdata  (mem_axil_rdata),
+    .m0_axil_rresp  (mem_axil_rresp),
+    .m0_axil_rvalid (mem_axil_rvalid),
+    .m0_axil_rready (mem_axil_rready),
+    .m1_axil_awaddr (csr_axil_awaddr),
+    .m1_axil_awprot (csr_axil_awprot),
+    .m1_axil_awvalid(csr_axil_awvalid),
+    .m1_axil_awready(csr_axil_awready),
+    .m1_axil_wdata  (csr_axil_wdata),
+    .m1_axil_wstrb  (csr_axil_wstrb),
+    .m1_axil_wvalid (csr_axil_wvalid),
+    .m1_axil_wready (csr_axil_wready),
+    .m1_axil_bresp  (csr_axil_bresp),
+    .m1_axil_bvalid (csr_axil_bvalid),
+    .m1_axil_bready (csr_axil_bready),
+    .m1_axil_araddr (csr_axil_araddr),
+    .m1_axil_arprot (csr_axil_arprot),
+    .m1_axil_arvalid(csr_axil_arvalid),
+    .m1_axil_arready(csr_axil_arready),
+    .m1_axil_rdata  (csr_axil_rdata),
+    .m1_axil_rresp  (csr_axil_rresp),
+    .m1_axil_rvalid (csr_axil_rvalid),
+    .m1_axil_rready (csr_axil_rready)
+);
+
+// Interconnect: mem master -> {slave 0 scratch RAM, slave 1 SDRAM}
+wire [31:0] ram_axil_awaddr, ram_axil_wdata, ram_axil_araddr, ram_axil_rdata;
+wire [2:0]  ram_axil_awprot, ram_axil_arprot;
+wire [3:0]  ram_axil_wstrb;
+wire [1:0]  ram_axil_bresp, ram_axil_rresp;
+wire        ram_axil_awvalid, ram_axil_awready, ram_axil_wvalid, ram_axil_wready,
+            ram_axil_bvalid, ram_axil_bready, ram_axil_arvalid, ram_axil_arready,
+            ram_axil_rvalid, ram_axil_rready;
+
+wire [31:0] sdram_axil_awaddr, sdram_axil_wdata, sdram_axil_araddr, sdram_axil_rdata;
+wire [2:0]  sdram_axil_awprot, sdram_axil_arprot;
+wire [3:0]  sdram_axil_wstrb;
+wire [1:0]  sdram_axil_bresp, sdram_axil_rresp;
+wire        sdram_axil_awvalid, sdram_axil_awready, sdram_axil_wvalid, sdram_axil_wready,
+            sdram_axil_bvalid, sdram_axil_bready, sdram_axil_arvalid, sdram_axil_arready,
+            sdram_axil_rvalid, sdram_axil_rready;
+
+axil_interconnect #(
+    .SelBit(28)
+) i_ic (
+    .s_axil_awaddr (mem_axil_awaddr),
+    .s_axil_awprot (mem_axil_awprot),
+    .s_axil_awvalid(mem_axil_awvalid),
+    .s_axil_awready(mem_axil_awready),
+    .s_axil_wdata  (mem_axil_wdata),
+    .s_axil_wstrb  (mem_axil_wstrb),
+    .s_axil_wvalid (mem_axil_wvalid),
+    .s_axil_wready (mem_axil_wready),
+    .s_axil_bresp  (mem_axil_bresp),
+    .s_axil_bvalid (mem_axil_bvalid),
+    .s_axil_bready (mem_axil_bready),
+    .s_axil_araddr (mem_axil_araddr),
+    .s_axil_arprot (mem_axil_arprot),
+    .s_axil_arvalid(mem_axil_arvalid),
+    .s_axil_arready(mem_axil_arready),
+    .s_axil_rdata  (mem_axil_rdata),
+    .s_axil_rresp  (mem_axil_rresp),
+    .s_axil_rvalid (mem_axil_rvalid),
+    .s_axil_rready (mem_axil_rready),
     .m0_axil_awaddr (ram_axil_awaddr),
     .m0_axil_awprot (ram_axil_awprot),
     .m0_axil_awvalid(ram_axil_awvalid),
@@ -267,6 +352,76 @@ sdram_wrap i_sdram (
     .sdram_dq_i  (sdram_dq_in)
 );
 
+// On-chip ADPLL (observe-only). CSR at 0x2000_0000 sets enable/mul/div over Ethernet; the
+// bang-bang controller tunes a ring DCO so F_DCO = (mul/div)*clk. The DCO clock and lock are
+// routed to the two analog observation pads. It does NOT clock the core.
+wire        pll_enable;
+wire [23:0] pll_mul;
+wire [15:0] pll_div;
+wire        pll_lock;
+wire [6:0]  pll_tune;
+wire        pll_dco_clk;
+
+adpll_csr #(
+    .NumTuneBits(7),
+    .CountWidth (24),
+    .DivWidth   (16)
+) i_pll_csr (
+    .clk_i (clk),
+    .rst_ni(rst_n),
+    .s_axil_awaddr (csr_axil_awaddr),
+    .s_axil_awprot (csr_axil_awprot),
+    .s_axil_awvalid(csr_axil_awvalid),
+    .s_axil_awready(csr_axil_awready),
+    .s_axil_wdata  (csr_axil_wdata),
+    .s_axil_wstrb  (csr_axil_wstrb),
+    .s_axil_wvalid (csr_axil_wvalid),
+    .s_axil_wready (csr_axil_wready),
+    .s_axil_bresp  (csr_axil_bresp),
+    .s_axil_bvalid (csr_axil_bvalid),
+    .s_axil_bready (csr_axil_bready),
+    .s_axil_araddr (csr_axil_araddr),
+    .s_axil_arprot (csr_axil_arprot),
+    .s_axil_arvalid(csr_axil_arvalid),
+    .s_axil_arready(csr_axil_arready),
+    .s_axil_rdata  (csr_axil_rdata),
+    .s_axil_rresp  (csr_axil_rresp),
+    .s_axil_rvalid (csr_axil_rvalid),
+    .s_axil_rready (csr_axil_rready),
+    .enable_o(pll_enable),
+    .mul_o   (pll_mul),
+    .div_o   (pll_div),
+    .lock_i  (pll_lock),
+    .tune_i  (pll_tune)
+);
+
+adpll_ctrl #(
+    .NumTuneBits(7),
+    .CountWidth (24),
+    .DivWidth   (16)
+) i_pll_ctrl (
+    .clk_i    (clk),
+    .rst_ni   (rst_n),
+    .enable_i (pll_enable),
+    .mul_i    (pll_mul),
+    .div_i    (pll_div),
+    .dco_clk_i(pll_dco_clk),
+    .tune_o   (pll_tune),
+    .lock_o   (pll_lock)
+);
+
+ring_dco #(
+    .NumTuneBits(7)
+) i_pll_dco (
+    .enable_i(pll_enable),
+    .tune_i  (pll_tune),
+    .clk_o   (pll_dco_clk)
+);
+
+// Analog observation pads: [0] = DCO clock, [1] = lock.
+assign analog[0] = pll_dco_clk;
+assign analog[1] = pll_lock;
+
 // Bidir pad outputs (see pad map above)
 assign bidir_out[0]     = rmii_tx_en;
 assign bidir_out[2:1]   = rmii_txd;
@@ -301,7 +456,7 @@ assign input_pd = '0;
 
 logic _unused;
 assign _unused = &{1'b0, led[7:4], input_in[NUM_INPUT_PADS-1:4],
-                   bidir_in[7:0], bidir_in[NUM_BIDIR_PADS-1:24], analog};
+                   bidir_in[7:0], bidir_in[NUM_BIDIR_PADS-1:24]};
 
 endmodule
 

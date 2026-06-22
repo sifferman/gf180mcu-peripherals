@@ -61,9 +61,9 @@ module adpll_freq_counter #(
     output wire                       sample_valid_o
 );
 
-// ============================================================ //
-//  Generate running_dco_edge_count_sync in the 'clk_i' domain  //
-// ============================================================ //
+// =============================================================== //
+//  Generate continuous_dco_edge_count_sync in the 'clk_i' domain  //
+// =============================================================== //
 
 function automatic logic [EdgeCountWidth-1:0] bin2gray(logic [EdgeCountWidth-1:0] b);
     bin2gray = b ^ (b >> 1);
@@ -76,17 +76,17 @@ endfunction
 
 // DCO domain: free-running edge counter, with a Gray-coded copy for the clock crossing
 // (one bit changes per edge, so it survives the two-flop synchronizer below).
-logic [EdgeCountWidth-1:0] running_dco_edge_count_binary_d, running_dco_edge_count_binary_q;
-logic [EdgeCountWidth-1:0] running_dco_edge_count_gray_d,   running_dco_edge_count_gray_q;
-always_comb running_dco_edge_count_binary_d = running_dco_edge_count_binary_q + 1'b1;
-always_comb running_dco_edge_count_gray_d   = bin2gray(running_dco_edge_count_binary_d);
+logic [EdgeCountWidth-1:0] continuous_dco_edge_count_binary_d, continuous_dco_edge_count_binary_q;
+logic [EdgeCountWidth-1:0] continuous_dco_edge_count_gray_d,   continuous_dco_edge_count_gray_q;
+always_comb continuous_dco_edge_count_binary_d = continuous_dco_edge_count_binary_q + 1'b1;
+always_comb continuous_dco_edge_count_gray_d   = bin2gray(continuous_dco_edge_count_binary_d);
 always_ff @(posedge dco_clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-        running_dco_edge_count_binary_q <= '0;
-        running_dco_edge_count_gray_q   <= '0;
+        continuous_dco_edge_count_binary_q <= '0;
+        continuous_dco_edge_count_gray_q   <= '0;
     end else begin
-        running_dco_edge_count_binary_q <= running_dco_edge_count_binary_d;
-        running_dco_edge_count_gray_q   <= running_dco_edge_count_gray_d;
+        continuous_dco_edge_count_binary_q <= continuous_dco_edge_count_binary_d;
+        continuous_dco_edge_count_gray_q   <= continuous_dco_edge_count_gray_d;
     end
 end
 
@@ -97,12 +97,12 @@ always_ff @(posedge clk_i or negedge rst_ni) begin
         gray_sync_q1 <= '0;
         gray_sync_q2 <= '0;
     end else begin
-        gray_sync_q1 <= running_dco_edge_count_gray_q;   // CDC capture from the DCO domain
+        gray_sync_q1 <= continuous_dco_edge_count_gray_q;   // CDC capture from the DCO domain
         gray_sync_q2 <= gray_sync_q1;            // settle
     end
 end
-logic [EdgeCountWidth-1:0] running_dco_edge_count_sync;
-always_comb running_dco_edge_count_sync = gray2bin(gray_sync_q2);
+logic [EdgeCountWidth-1:0] continuous_dco_edge_count_sync;
+always_comb continuous_dco_edge_count_sync = gray2bin(gray_sync_q2);
 
 
 // ================================================== //
@@ -125,11 +125,11 @@ always_comb begin
     sample_valid_d          = 1'b0;
     if (!enable_i) begin
         window_cycle_count_d    = '0;
-        count_at_window_start_d = running_dco_edge_count_sync;
+        count_at_window_start_d = continuous_dco_edge_count_sync;
     end else if (window_tick) begin
         window_cycle_count_d    = '0;
-        dco_edge_count_d        = running_dco_edge_count_sync - count_at_window_start_q;
-        count_at_window_start_d = running_dco_edge_count_sync;   // start point for the next window
+        dco_edge_count_d        = continuous_dco_edge_count_sync - count_at_window_start_q;
+        count_at_window_start_d = continuous_dco_edge_count_sync;   // start point for the next window
         sample_valid_d          = 1'b1;
     end
 end

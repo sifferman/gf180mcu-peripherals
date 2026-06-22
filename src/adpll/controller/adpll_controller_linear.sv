@@ -53,8 +53,10 @@
 
 module adpll_controller_linear #(
     parameter int unsigned NumTuneBits = 7,
-    parameter int unsigned EdgeCountWidth  = 24,
-    parameter int unsigned WindowCountWidth    = 16,
+    parameter  int unsigned MaxEdgesPerWindow = (1 << 24) - 1,
+    localparam int unsigned EdgeCountWidth    = $clog2(MaxEdgesPerWindow + 1),
+    parameter  int unsigned MaxWindowSize     = (1 << 16) - 1,
+    localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1),
     parameter int unsigned LockWindows = 8,
     parameter int unsigned LockBand    = 2,    // linear loop dithers a little more than bang-bang
     // On a COARSE DCO the from-cold frequency error is huge (thousands of edges), so the
@@ -68,7 +70,7 @@ module adpll_controller_linear #(
     input  wire                   rst_ni,
     input  wire                   enable_i,
     input  wire [EdgeCountWidth-1:0]  mul_i,
-    input  wire [WindowCountWidth-1:0]    div_i,
+    input  wire [WindowSizeWidth-1:0]    div_i,
     input  wire                   dco_clk_i,
 
     output wire [NumTuneBits-1:0] tune_o,
@@ -79,8 +81,8 @@ wire [EdgeCountWidth-1:0] measured;
 wire                  sample_valid;
 
 adpll_freq_counter #(
-    .EdgeCountWidth(EdgeCountWidth),
-    .WindowCountWidth  (WindowCountWidth)
+    .MaxEdgesPerWindow(MaxEdgesPerWindow),
+    .MaxWindowSize(MaxWindowSize)
 ) u_meas (
     .clk_i,
     .rst_ni,

@@ -38,14 +38,16 @@
 
 module adpll_bangbang_muxtap #(
     parameter int unsigned NumTuneBits = 7,
-    parameter int unsigned EdgeCountWidth  = 24,
-    parameter int unsigned WindowCountWidth    = 16
+    parameter  int unsigned MaxEdgesPerWindow = (1 << 24) - 1,
+    localparam int unsigned EdgeCountWidth    = $clog2(MaxEdgesPerWindow + 1),
+    parameter  int unsigned MaxWindowSize     = (1 << 16) - 1,
+    localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1)
 ) (
     input  wire                   clk_i,
     input  wire                   rst_ni,
     input  wire                   enable_i,
     input  wire [EdgeCountWidth-1:0]  mul_i,
-    input  wire [WindowCountWidth-1:0]    div_i,
+    input  wire [WindowSizeWidth-1:0]    div_i,
 
     output wire                   lock_o,
     output wire [NumTuneBits-1:0] tune_o,
@@ -57,8 +59,8 @@ wire                   dco_clk;
 
 adpll_controller_bangbang #(
     .NumTuneBits(NumTuneBits),
-    .EdgeCountWidth (EdgeCountWidth),
-    .WindowCountWidth   (WindowCountWidth)
+    .MaxEdgesPerWindow(MaxEdgesPerWindow),
+    .MaxWindowSize(MaxWindowSize)
 ) u_ctrl (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),

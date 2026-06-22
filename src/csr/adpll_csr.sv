@@ -34,7 +34,7 @@
 // Register map (word-addressed, byte offsets):
 //   0x0 CTRL    [0]      enable          (R/W)
 //   0x4 MUL     [EdgeCountWidth-1:0] mul (N)  (R/W)
-//   0x8 DIV     [WindowCountWidth-1:0]   div (M)  (R/W)
+//   0x8 DIV     [WindowSizeWidth-1:0]   div (M)  (R/W)
 //   0xC STATUS  [0] lock, [NumTuneBits:1] tune   (RO)
 
 `default_nettype none
@@ -42,8 +42,10 @@
 module adpll_csr #(
     parameter int unsigned AddrWidth   = 32,
     parameter int unsigned NumTuneBits = 7,
-    parameter int unsigned EdgeCountWidth  = 24,
-    parameter int unsigned WindowCountWidth    = 16
+    parameter  int unsigned MaxEdgesPerWindow = (1 << 24) - 1,
+    localparam int unsigned EdgeCountWidth    = $clog2(MaxEdgesPerWindow + 1),
+    parameter  int unsigned MaxWindowSize     = (1 << 16) - 1,
+    localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1)
 ) (
     input  wire                  clk_i,
     input  wire                  rst_ni,
@@ -76,7 +78,7 @@ module adpll_csr #(
      */
     output wire                   enable_o,
     output wire [EdgeCountWidth-1:0]  mul_o,
-    output wire [WindowCountWidth-1:0]    div_o,
+    output wire [WindowSizeWidth-1:0]    div_o,
     input  wire                   lock_i,
     input  wire [NumTuneBits-1:0] tune_i
 );
@@ -85,13 +87,13 @@ localparam int unsigned AddrLsb = 2;   // 32-bit registers
 
 logic                  ctrl_q;          // CTRL[0] = enable
 logic [EdgeCountWidth-1:0] mul_q;
-logic [WindowCountWidth-1:0]   div_q;
+logic [WindowSizeWidth-1:0]   div_q;
 
 logic _unused;
 assign _unused = &{1'b0, s_axil_awprot, s_axil_arprot,
                    s_axil_awaddr[AddrWidth-1:AddrLsb+2], s_axil_awaddr[AddrLsb-1:0],
                    s_axil_araddr[AddrWidth-1:AddrLsb+2], s_axil_araddr[AddrLsb-1:0],
-                   s_axil_wdata[31:EdgeCountWidth], s_axil_wdata[31:WindowCountWidth]};
+                   s_axil_wdata[31:EdgeCountWidth], s_axil_wdata[31:WindowSizeWidth]};
 
 // ---- write channel ----
 logic       bvalid_d, bvalid_q;
@@ -106,7 +108,7 @@ end
 
 logic                  ctrl_d;
 logic [EdgeCountWidth-1:0] mul_d;
-logic [WindowCountWidth-1:0]   div_d;
+logic [WindowSizeWidth-1:0]   div_d;
 always_comb begin
     ctrl_d = ctrl_q;
     mul_d  = mul_q;
@@ -115,7 +117,7 @@ always_comb begin
         case (write_index)
             2'd0: ctrl_d = s_axil_wdata[0];
             2'd1: mul_d  = s_axil_wdata[EdgeCountWidth-1:0];
-            2'd2: div_d  = s_axil_wdata[WindowCountWidth-1:0];
+            2'd2: div_d  = s_axil_wdata[WindowSizeWidth-1:0];
             default: ;   // STATUS is read-only
         endcase
     end
@@ -160,7 +162,7 @@ always_comb begin
         case (read_index)
             2'd0:    rdata_d = {31'b0, ctrl_q};
             2'd1:    rdata_d = {{(32-EdgeCountWidth){1'b0}}, mul_q};
-            2'd2:    rdata_d = {{(32-WindowCountWidth){1'b0}}, div_q};
+            2'd2:    rdata_d = {{(32-WindowSizeWidth){1'b0}}, div_q};
             default: rdata_d = status_word;
         endcase
     end

@@ -363,9 +363,7 @@ wire [6:0]  pll_tune;
 wire        pll_dco_clk;
 
 adpll_csr #(
-    .NumTuneBits(7),
-    .EdgeCountWidth (24),
-    .WindowCountWidth   (16)
+    .NumTuneBits(7)
 ) i_pll_csr (
     .clk_i (clk),
     .rst_ni(rst_n),
@@ -396,9 +394,7 @@ adpll_csr #(
 );
 
 adpll_controller_bangbang #(
-    .NumTuneBits(7),
-    .EdgeCountWidth (24),
-    .WindowCountWidth   (16)
+    .NumTuneBits(7)
 ) i_pll_ctrl (
     .clk_i    (clk),
     .rst_ni   (rst_n),

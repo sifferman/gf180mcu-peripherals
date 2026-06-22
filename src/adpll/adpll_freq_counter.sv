@@ -45,13 +45,15 @@
 `default_nettype none
 
 module adpll_freq_counter #(
-    parameter int unsigned EdgeCountWidth   = 24,
-    parameter int unsigned WindowCountWidth = 16
+    parameter  int unsigned MaxEdgesPerWindow = (1 << 24) - 1,
+    localparam int unsigned EdgeCountWidth    = $clog2(MaxEdgesPerWindow + 1),
+    parameter  int unsigned MaxWindowSize     = (1 << 16) - 1,
+    localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1)
 ) (
     input  wire                         clk_i,
     input  wire                         rst_ni,
     input  wire                         enable_i,
-    input  wire [WindowCountWidth-1:0]  div_i,        // measurement window length, in clk_i cycles
+    input  wire [WindowSizeWidth-1:0]  div_i,        // measurement window length, in clk_i cycles
     input  wire                         dco_clk_i,
 
     output wire [EdgeCountWidth-1:0]    measured_o,   // DCO edges in the last completed window
@@ -101,7 +103,7 @@ end
 wire [EdgeCountWidth-1:0] dco_cnt_sync = gray2bin(gray_sync1_q);
 
 // Programmable measurement window: a clk_i counter that rolls over every div_i cycles.
-logic [WindowCountWidth-1:0]   window_cnt_d,    window_cnt_q;
+logic [WindowSizeWidth-1:0]   window_cnt_d,    window_cnt_q;
 logic [EdgeCountWidth-1:0] cnt_at_window_d, cnt_at_window_q;  // edge-count snapshot at window edge
 logic [EdgeCountWidth-1:0] measured_d,      measured_q;
 logic                  sample_valid_d,  sample_valid_q;

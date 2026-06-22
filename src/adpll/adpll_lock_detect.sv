@@ -27,43 +27,43 @@
 // adpll_lock_detect
 //
 // Ref: Lee, Kundert & Razavi, IEEE JSSC 39(9), 2004 (bang-bang limit-cycle lock).
-// Asserts lock_o once the sampled value stays within +/-Band of an anchor (its held reference) for
-// LockWindows consecutive samples.
+// Asserts lock_o once the sampled value stays within +/-BandRadius of the band_center (its
+// held reference) for LockSamples consecutive samples.
 //
 // Parameters:
-//   - Width       : width of the sample
-//   - LockWindows : in-band samples required to declare lock
-//   - Band        : +/- tolerance, in LSBs
+//   - SampleWidth : width of the sample
+//   - LockSamples : consecutive in-band samples required to declare lock
+//   - BandRadius  : +/- tolerance around band_center, in LSBs
 // Ports:
 //   - clk_i, rst_ni, enable_i
-//   - sample_valid_i : strobe qualifying sample_i
-//   - sample_i       : value sampled each window (its stability is what is detected)
-//   - lock_o         : lock asserted
+//   - sample_valid_i  : strobe qualifying tuning_sample_i
+//   - tuning_sample_i : value sampled each window (its stability is what is detected)
+//   - lock_o          : lock asserted
 
 module adpll_lock_detect #(
-    parameter int unsigned Width       = 7,
-    parameter int unsigned LockWindows = 8,
-    parameter int unsigned Band        = 1
+    parameter int unsigned SampleWidth = 7,
+    parameter int unsigned LockSamples = 8,
+    parameter int unsigned BandRadius  = 1
 ) (
-    input  wire             clk_i,
-    input  wire             rst_ni,
+    input  wire                   clk_i,
+    input  wire                   rst_ni,
 
-    input  wire             enable_i,
-    input  wire             sample_valid_i,
-    input  wire [Width-1:0] sample_i,
-    output wire             lock_o
+    input  wire                   enable_i,
+    input  wire                   sample_valid_i,
+    input  wire [SampleWidth-1:0] tuning_sample_i,
+    output wire                   lock_o
 );
 
-logic [Width-1:0]                 anchor_d,  anchor_q;
-logic [$clog2(LockWindows+1)-1:0] in_band_d, in_band_q;
+logic [SampleWidth-1:0]                 band_center_d,  band_center_q;
+logic [$clog2(LockSamples+1)-1:0] in_band_d, in_band_q;
 logic                             lock_d,    lock_q;
 
-localparam logic signed [Width+1:0] BandSigned = (Width+2)'(Band);
-wire signed [Width+1:0] band_err = $signed({2'b0, sample_i}) - $signed({2'b0, anchor_q});
+localparam logic signed [SampleWidth+1:0] BandSigned = (SampleWidth+2)'(BandRadius);
+wire signed [SampleWidth+1:0] band_err = $signed({2'b0, tuning_sample_i}) - $signed({2'b0, band_center_q});
 wire in_band = (band_err >= -BandSigned) && (band_err <= BandSigned);
 
 always_comb begin
-    anchor_d  = anchor_q;
+    band_center_d  = band_center_q;
     in_band_d = in_band_q;
     lock_d    = lock_q;
     if (!enable_i) begin
@@ -71,12 +71,12 @@ always_comb begin
         lock_d    = 1'b0;
     end else if (sample_valid_i) begin
         if (in_band) begin
-            if (in_band_q == LockWindows[$bits(in_band_q)-1:0])
+            if (in_band_q == LockSamples[$bits(in_band_q)-1:0])
                 lock_d = 1'b1;
             else
                 in_band_d = in_band_q + 1'b1;
         end else begin
-            anchor_d  = sample_i;
+            band_center_d  = tuning_sample_i;
             in_band_d = '0;
             lock_d    = 1'b0;
         end
@@ -85,11 +85,11 @@ end
 
 always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-        anchor_q  <= '0;
+        band_center_q  <= '0;
         in_band_q <= '0;
         lock_q    <= 1'b0;
     end else begin
-        anchor_q  <= anchor_d;
+        band_center_q  <= band_center_d;
         in_band_q <= in_band_d;
         lock_q    <= lock_d;
     end

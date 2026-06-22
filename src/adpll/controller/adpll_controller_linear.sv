@@ -128,15 +128,15 @@ end
 
 // The linear loop settles to a near-static code, so watch the output tune directly.
 adpll_lock_detect #(
-    .Width      (NumTuneBits),
-    .LockWindows(LockWindows),
-    .Band       (LockBand)
+    .SampleWidth      (NumTuneBits),
+    .LockSamples(LockWindows),
+    .BandRadius       (LockBand)
 ) adpll_lock_detect (
     .clk_i,
     .rst_ni,
     .enable_i,
     .sample_valid_i(sample_valid),
-    .sample_i      (tune_q),
+    .tuning_sample_i      (tune_q),
     .lock_o        (lock_o)
 );
 

@@ -126,15 +126,15 @@ end
 
 // Lock on the integral operating point (the clean code, not the +-1 LSB limit cycle).
 adpll_lock_detect #(
-    .Width      (NumTuneBits),
-    .LockWindows(LockWindows),
-    .Band       (1)
+    .SampleWidth      (NumTuneBits),
+    .LockSamples(LockWindows),
+    .BandRadius       (1)
 ) adpll_lock_detect (
     .clk_i,
     .rst_ni,
     .enable_i,
     .sample_valid_i(sample_valid),
-    .sample_i      (integral_q),
+    .tuning_sample_i      (integral_q),
     .lock_o        (lock_o)
 );
 

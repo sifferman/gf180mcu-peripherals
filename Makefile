@@ -191,6 +191,15 @@ sim-adpll-matrix: ## Verify ALL 12 ADPLL variants (3 controllers x 4 DCOs): lock
 	done
 .PHONY: sim-adpll-matrix
 
+sim-adpll-phase: ## Phase-domain ADPLL (TDC + reference/variable phase accumulators): true phase lock
+	@mkdir -p cocotb/sim_build
+	iverilog -g2012 -o cocotb/sim_build/tb_adpll_phase $(ADPLL_TS) \
+		src/adpll/adpll_freq_counter.sv src/adpll/adpll_lock_detect.sv src/adpll/adpll_tdc.sv \
+		src/adpll/controller/adpll_controller_phase.sv src/adpll/dco/ring_dco_binary.sv \
+		cocotb/models/tb_adpll_phase.v
+	vvp cocotb/sim_build/tb_adpll_phase | grep -E "LOCKED|PASS|FAIL"
+.PHONY: sim-adpll-phase
+
 # ngspice >= 42 is required for the gf180 BSIM4 models (mulu0 et al); override NGSPICE
 # to point at a new enough build if the default is too old.
 NGSPICE ?= ngspice

@@ -89,17 +89,18 @@ set_timing_derate -late [expr 1+[expr $::env(TIME_DERATING_CONSTRAINT) / 100]]
 # core clock so STA treats the freq_meas CDC correctly. Guarded so builds without the ADPLL
 # are unaffected. The ring's combinational loop is broken by the timing engine; the ring
 # cells are preserved by (* keep *)/(* dont_touch *) in ring_dco.sv.
-set dco_net [get_nets -quiet {analog_PAD[0]}]
-if { $dco_net == "" } {
-    set dco_net [get_pins -quiet -hierarchical "*i_pll_dco*u_sel*Y*"]
+# create_clock needs a port/pin (not a net), so target the analog_PAD[0] port itself.
+set dco_obj [get_ports -quiet {analog_PAD[0]}]
+if { $dco_obj == "" } {
+    set dco_obj [get_pins -quiet -hierarchical "*i_pll_dco*u_sel*Y*"]
 }
-if { $dco_net != "" } {
-    puts "\[INFO] Defining ADPLL dco_clk on: $dco_net"
-    create_clock -name dco_clk -period 2.0 $dco_net
+if { $dco_obj != "" } {
+    puts "\[INFO] Defining ADPLL dco_clk on: $dco_obj"
+    create_clock -name dco_clk -period 2.0 $dco_obj
     catch { set_clock_groups -asynchronous \
         -group [get_clocks $clock_port] -group [get_clocks dco_clk] }
 } else {
-    puts "\[INFO] No ADPLL DCO net found; skipping dco_clk (build without ADPLL)."
+    puts "\[INFO] No ADPLL DCO port found; skipping dco_clk (build without ADPLL)."
 }
 
 if { [info exists ::env(OPENLANE_SDC_IDEAL_CLOCKS)] && $::env(OPENLANE_SDC_IDEAL_CLOCKS) } {

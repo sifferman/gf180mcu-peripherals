@@ -39,15 +39,80 @@ def pdk_paths(pdk_root, pdk="gf180mcuD"):
     return design, models, cells
 
 
-def gen_deck(design, models, cells, bits, code, vdd=3.3, corner="typical", temp=25.0,
-             tstop_ns=1600.0, tstep_ps=10.0, settle_rise=6, meas_periods=10):
-    """Return a SPICE deck string for one tune code at one PVT corner."""
+TOPOLOGIES = ("binary", "thermometer", "muxtap")
+
+
+def _inv_pair(a, src, mid, dst):
+    """Two inv_2 in series (non-inverting delay): src -> mid -> dst.  (pins Y A)"""
+    a(f"X{mid} VDD VNW VPW VSS {mid} {src} {CELL}__inv_2")
+    a(f"X{dst} VDD VNW VPW VSS {dst} {mid} {CELL}__inv_2")
+
+
+def _ring_binary(a, bits, code):
+    """ring_dco_binary: segment i = 2**i inverter pairs, a mux per segment inserts or
+    bypasses that delay by the binary value of `code`.  Returns the oscillating net."""
+    a(f"Xgate VDD VNW VPW VSS node0 OUT enable {CELL}__nand2_2")   # node0 = NAND(enable, OUT)
+    node = "node0"
+    for i in range(bits):
+        d_prev = node
+        for j in range(1 << i):
+            _inv_pair(a, d_prev, f"b{i}_{j}m", f"b{i}_{j}o")
+            d_prev = f"b{i}_{j}o"
+        sel = "VDD" if (code >> i) & 1 else "0"          # fixed code -> hard tie
+        nxt = "OUT" if i == bits - 1 else f"node{i+1}"
+        a(f"Xsel{i} VDD VNW VPW VSS {sel} {d_prev} {node} {nxt} {CELL}__mux2_2")  # S B A Y
+        node = nxt
+    return "OUT"
+
+
+def _ring_thermometer(a, bits, code):
+    """ring_dco_thermometer: 2**bits-1 identical unit pairs; the first `code` of them are
+    inserted (monotonic).  Each unit's select is a hard tie since `code` is fixed."""
+    num_units = (1 << bits) - 1
+    a(f"Xgate VDD VNW VPW VSS node0 OUT enable {CELL}__nand2_2")
+    node = "node0"
+    for k in range(num_units):
+        _inv_pair(a, node, f"u{k}m", f"u{k}d")
+        sel = "VDD" if k < code else "0"
+        nxt = "OUT" if k == num_units - 1 else f"u{k}n"
+        a(f"Xsel{k} VDD VNW VPW VSS {sel} u{k}d {node} {nxt} {CELL}__mux2_2")
+        node = nxt
+    return "OUT"
+
+
+def _ring_muxtap(a, bits, code):
+    """ring_dco_muxtap: a 2**bits-tap delay chain selected by a binary mux tree; `code`
+    picks which tap closes the loop (variable ring length).  Returns the oscillating net."""
+    num_taps = 1 << bits
+    a(f"Xgate VDD VNW VPW VSS tap0 OUT enable {CELL}__nand2_2")
+    for k in range(1, num_taps):
+        _inv_pair(a, f"tap{k-1}", f"t{k}m", f"tap{k}")
+    level = [f"tap{i}" for i in range(num_taps)]
+    for lvl in range(1, bits + 1):
+        sel = "VDD" if (code >> (lvl - 1)) & 1 else "0"
+        nxt = []
+        for i in range(num_taps >> lvl):
+            y = "OUT" if (lvl == bits and i == 0) else f"tl{lvl}_{i}"
+            a(f"Xmux{lvl}_{i} VDD VNW VPW VSS {sel} {level[2*i+1]} {level[2*i]} {y} {CELL}__mux2_2")
+            nxt.append(y)
+        level = nxt
+    return "OUT"
+
+
+_RINGS = {"binary": _ring_binary, "thermometer": _ring_thermometer, "muxtap": _ring_muxtap}
+
+
+def gen_deck(design, models, cells, bits, code, topology="binary", vdd=3.3, corner="typical",
+             temp=25.0, tstop_ns=1600.0, tstep_ps=10.0, settle_rise=6, meas_periods=10):
+    """Return a SPICE deck string for one tune code / topology at one PVT corner. Mirrors
+    the three RTL DCOs in src/adpll/dco/. Since the tune code is fixed per run, every mux
+    select is a hard tie to VDD/VSS (no tune-net drivers needed)."""
     # ngspice is picky: .lib/.include paths must be UNQUOTED, and .measure right-hand
     # sides must be literal numbers (a {VDD/2} param expression fails to evaluate).
     vth = vdd / 2.0
     L = []
     a = L.append
-    a(f"* ring_dco binary-weighted DCO  bits={bits} code={code} corner={corner} vdd={vdd} temp={temp}")
+    a(f"* ring_dco_{topology} DCO  bits={bits} code={code} corner={corner} vdd={vdd} temp={temp}")
     a(f".include {design}")               # statistical params referenced by the models
     a(f".lib {models} {corner}")          # process corner (transistor model skew)
     a(f".include {cells}")
@@ -60,38 +125,17 @@ def gen_deck(design, models, cells, bits, code, vdd=3.3, corner="typical", temp=
     a("Vss  VSS 0 0")
     # enable: rise at 1 ns to kick-start oscillation
     a("Ven  enable 0 PWL(0 0 1n 0 1.05n {VDD})")
-    # tune bit drivers
-    for i in range(bits):
-        lvl = "{VDD}" if (code >> i) & 1 else "0"
-        a(f"Vt{i} tune{i} 0 {lvl}")
     a("")
-    # gate: node0 = NAND(enable, feedback) where feedback == the output node node{bits}
-    # (pins: Y B A); wiring node{bits} straight into B closes the ring.
-    a(f"Xgate VDD VNW VPW VSS node0 node{bits} enable {CELL}__nand2_2")
-    # weighted delay segments + selects
-    for i in range(bits):
-        npairs = 1 << i
-        innode = f"node{i}"
-        # inverter-pair delay chain
-        d_prev = innode
-        for j in range(npairs):
-            mid = f"d{i}_{j}_m"
-            out = f"d{i}_{j}_o"
-            a(f"Xi{i}_{j}a VDD VNW VPW VSS {mid} {d_prev} {CELL}__inv_2")   # Y A
-            a(f"Xi{i}_{j}b VDD VNW VPW VSS {out} {mid} {CELL}__inv_2")
-            d_prev = out
-        delayed = d_prev  # node[i] if npairs==0, but npairs>=1 always here
-        # mux: Y=node{i+1}, S=tune i, B=delayed, A=bypass(node i)   (pins: S B A Y)
-        a(f"Xsel{i} VDD VNW VPW VSS tune{i} {delayed} {innode} node{i+1} {CELL}__mux2_2")
-    a(f"Cload node{bits} 0 1f")          # tiny load on the output node
+    out = _RINGS[topology](a, bits, code)
+    a(f"Cload {out} 0 1f")               # tiny load on the output node
     a("")
     a(".tran {}p {}n uic".format(tstep_ps, tstop_ns))
     a(".control")
     a("run")
     # Measure the time of two rising crossings `meas_periods` apart, after the startup
     # transient settles; the Python wrapper computes period = (t_b - t_a)/meas_periods.
-    a(f"meas tran t_a WHEN v(node{bits})={vth:.4f} RISE={settle_rise}")
-    a(f"meas tran t_b WHEN v(node{bits})={vth:.4f} RISE={settle_rise + meas_periods}")
+    a(f"meas tran t_a WHEN v({out})={vth:.4f} RISE={settle_rise}")
+    a(f"meas tran t_b WHEN v({out})={vth:.4f} RISE={settle_rise + meas_periods}")
     a(".endc")
     a(".end")
     return "\n".join(L) + "\n"
@@ -124,6 +168,8 @@ def main():
     ap.add_argument("--pdk", default="gf180mcuD")
     ap.add_argument("--bits", type=int, default=7)
     ap.add_argument("--code", type=int, default=0)
+    ap.add_argument("--topology", default="binary", choices=TOPOLOGIES,
+                    help="DCO topology to emit (mirrors the three src/adpll/dco RTL variants)")
     ap.add_argument("--corner", default="typical", help="process corner: typical|ss|ff|fs|sf")
     ap.add_argument("--vdd", type=float, default=3.3, help="supply voltage corner")
     ap.add_argument("--temp", type=float, default=25.0, help="temperature corner (C)")
@@ -141,16 +187,16 @@ def main():
 
     if args.sweep:
         codes = [int(c) for c in args.sweep.split(",")]
-        print(f"# ring_dco freq-vs-code sweep  bits={args.bits} corner={args.corner} vdd={args.vdd} temp={args.temp}", flush=True)
+        print(f"# ring_dco_{args.topology} freq-vs-code sweep  bits={args.bits} corner={args.corner} vdd={args.vdd} temp={args.temp}", flush=True)
         print(f"# {'code':>5}  {'freq_MHz':>12}  {'period_ns':>12}", flush=True)
         for code in codes:
             # Escalate tstop so fast (low) codes stay cheap and only slow (high) codes
             # pay for a long transient.
             freq = period = None
             for tstop in (150.0, 500.0, 1600.0, 5000.0):
-                deck = gen_deck(design, models, cells, args.bits, code,
+                deck = gen_deck(design, models, cells, args.bits, code, topology=args.topology,
                                 corner=args.corner, vdd=args.vdd, temp=args.temp, tstop_ns=tstop)
-                freq, period, txt, path = run_ngspice(deck, args.workdir, f"b{args.bits}_c{code}",
+                freq, period, txt, path = run_ngspice(deck, args.workdir, f"{args.topology}_b{args.bits}_c{code}",
                                                       ngspice=args.ngspice, meas_periods=10)
                 if freq:
                     break
@@ -161,10 +207,10 @@ def main():
                 sys.stderr.write(txt[-1500:] + "\n")
         return
 
-    deck = gen_deck(design, models, cells, args.bits, args.code,
+    deck = gen_deck(design, models, cells, args.bits, args.code, topology=args.topology,
                     corner=args.corner, vdd=args.vdd, temp=args.temp, tstop_ns=args.tstop_ns)
     if args.run:
-        freq, period, txt, path = run_ngspice(deck, args.workdir, f"b{args.bits}_c{args.code}", ngspice=args.ngspice, meas_periods=10)
+        freq, period, txt, path = run_ngspice(deck, args.workdir, f"{args.topology}_b{args.bits}_c{args.code}", ngspice=args.ngspice, meas_periods=10)
         print(txt)
         if freq:
             print(f"\n# RESULT bits={args.bits} code={args.code}: "

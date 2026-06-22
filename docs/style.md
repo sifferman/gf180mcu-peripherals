@@ -64,11 +64,6 @@ it is recorded here so the same mistake isn't repeated.
    ~10 lines of always_ff and an assign. No module needed.
 3. **Add a new module** — LAST RESORT. Check `third_party/` again first.
 
-- **No SystemVerilog `package`s.** The design is kept package-free. Share a
-  small pure function by defining it in each module that needs it (a few
-  duplicated lines beats a package + import + file-ordering dependency); keep
-  constants as module `localparam`s. Reusable *logic* still becomes a module.
-
 ## Instantiation
 
 - **One parameter/port connection per line.** Every `.name(value)` port

@@ -68,7 +68,7 @@ module adpll_controller_bangbang #(
     output wire                   lock_o
 );
 
-wire [EdgeCountWidth-1:0] measured;
+wire [EdgeCountWidth-1:0] dco_edge_count;
 wire                      sample_valid;
 
 adpll_freq_counter #(
@@ -78,14 +78,14 @@ adpll_freq_counter #(
     .clk_i,
     .rst_ni,
     .enable_i,
-    .div_i,
+    .window_length_i(div_i),
     .dco_clk_i,
-    .measured_o    (measured),
-    .sample_valid_o(sample_valid)
+    .dco_edge_count_o(dco_edge_count),
+    .sample_valid_o  (sample_valid)
 );
 
-wire too_fast = measured > mul_i;   // freq high => add delay  => raise tune
-wire too_slow = measured < mul_i;   // freq low  => cut delay  => lower tune
+wire too_fast = dco_edge_count > mul_i;   // freq high => add delay  => raise tune
+wire too_slow = dco_edge_count < mul_i;   // freq low  => cut delay  => lower tune
 
 localparam int unsigned TuneMax = (1 << NumTuneBits) - 1;
 

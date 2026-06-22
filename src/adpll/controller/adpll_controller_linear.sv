@@ -69,7 +69,7 @@ module adpll_controller_linear #(
     output wire                       lock_o
 );
 
-wire [EdgeCountWidth-1:0] measured;
+wire [EdgeCountWidth-1:0] dco_edge_count;
 wire                      sample_valid;
 
 adpll_freq_counter #(
@@ -79,10 +79,10 @@ adpll_freq_counter #(
     .clk_i,
     .rst_ni,
     .enable_i,
-    .div_i,
+    .window_length_i(div_i),
     .dco_clk_i,
-    .measured_o    (measured),
-    .sample_valid_o(sample_valid)
+    .dco_edge_count_o(dco_edge_count),
+    .sample_valid_o  (sample_valid)
 );
 
 localparam int unsigned TuneMax  = (1 << NumTuneBits) - 1;
@@ -106,7 +106,7 @@ always_comb begin
     accumulator_d = accumulator_q;
     tune_d        = tune_q;
     if (enable_i && sample_valid) begin
-        error           = $signed({2'b0, measured}) - $signed({2'b0, mul_i});
+        error           = $signed({2'b0, dco_edge_count}) - $signed({2'b0, mul_i});
         accumulator_sum = accumulator_q + AccWidth'(error);
         accumulator_d   = (accumulator_sum < 0)      ? '0 :
                           (accumulator_sum > AccMax) ? AccMax : accumulator_sum;

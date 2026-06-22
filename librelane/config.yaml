@@ -96,13 +96,16 @@ USE_SLANG: True
 #     blackboxes.
 #   --max-constexpr-steps    : yosys-slang reuses one slang EvalContext for the whole
 #     design, so slang's per-evaluation `steps` counter ACCUMULATES across every
-#     constexpr (notably verilog-ethernet's CRC `lfsr_mask`, evaluated once per
-#     output bit per instance). With the default 1,000,000 limit the design's two
-#     DATA_WIDTH=32 arp_cache lfsr instances push the running total over the limit,
-#     and slang then crashes (asserts on an empty SourceLocation) instead of erroring
-#     cleanly. Raising the ceiling lets the *real* CRC hash elaborate — no RTL
-#     workaround needed; the submodule stays pristine. (Root-caused in questions.md;
-#     upstream slang/yosys-slang fixes tracked there.)
+#     constexpr (notably verilog-ethernet's CRC `lfsr_mask`, evaluated once per output
+#     bit per instance). Once the running total passes the 1,000,000 default, slang
+#     crashes (asserts on an empty SourceLocation) instead of erroring cleanly. Raising
+#     the ceiling lets the *real* CRC hash elaborate — no RTL workaround, submodule stays
+#     pristine. STILL REQUIRED even with the bumped yosys-slang (flake pins povik master):
+#     its static-select fast-paths cut per-eval cost, but the full chip_top accumulates
+#     enough constexpr work across the whole eth+sdram stack to still exceed the default
+#     without this flag (verified — it crashes). The proper fix is the per-evaluation
+#     step-counter reset on sifferman/yosys-slang@fix-evalcontext-step-accumulation, which
+#     removes the need for this flag once merged upstream. (Root-caused in questions.md.)
 SLANG_ARGUMENTS: ['--ignore-unknown-modules', '--max-constexpr-steps', '1000000000']
 # The verilog-ethernet stack trips yosys's synth check with benign warnings that are
 # FPGA-proven and pass RTL sim: ~192 "no driver" on unused PTP timestamp ports

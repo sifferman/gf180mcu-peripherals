@@ -31,13 +31,13 @@ it is recorded here so the same mistake isn't repeated.
   `_d` (`_d = en ? next : _q`), never `if (en) _q <= …` in the `always_ff`.
   (The one pragmatic exception is a RAM write port — a memory array has no
   `_d` shadow, so `if (we) mem[addr] <= wdata` stays in the `always_ff`.)
-  A **shift-register / synchronizer stage** is also exempt from needing its own
-  `_d`: a later stage may take the prior stage's `_q` directly (`_q2 <= _q1`),
-  since its next-state *is* that `_q` and a separate `_d` net would just alias it.
-  Only the first (capture) stage keeps a `_d` (`_q1 <= _d1`). The flops of a
-  multi-stage synchronizer are numbered from one as peer stages (`_q1`, `_q2`) —
-  distinct from a delayed *copy* of a base signal, which is `_q`/`_q2`/`_q3` with
-  no `_q1`.
+  A **shift-register / synchronizer chain** is also exempt from the `_d`
+  requirement entirely: each stage's next-state is just the previous stage's `_q`
+  (or, for the capture flop, the source-domain `_q` it samples), so write
+  `_q1 <= src_q; _q2 <= _q1;` with no `_d` nets — a `_d` there would only alias a
+  `_q`. The flops of a multi-stage synchronizer are numbered from one as peer
+  stages (`_q1`, `_q2`) — distinct from a delayed *copy* of a base signal, which
+  is `_q`/`_q2`/`_q3` with no `_q1`.
 - **No abbreviations.** Spell the word out: `controller` not `ctrl`,
   `integral` not `integ`, `accumulator` not `acc`, `frequency` not `freq`
   (in prose). The only allowed short forms are universally understood ones:

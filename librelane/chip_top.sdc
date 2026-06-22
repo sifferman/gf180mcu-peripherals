@@ -89,19 +89,12 @@ set_timing_derate -late [expr 1+[expr $::env(TIME_DERATING_CONSTRAINT) / 100]]
 # core clock so STA treats the freq_meas CDC correctly. Guarded so builds without the ADPLL
 # are unaffected. The ring's combinational loop is broken by the timing engine; the ring
 # cells are preserved by (* keep *)/(* dont_touch *) in ring_dco.sv.
-# create_clock needs a port/pin (not a net), so target the analog_PAD[0] port itself.
-set dco_obj [get_ports -quiet {analog_PAD[0]}]
-if { $dco_obj == "" } {
-    set dco_obj [get_pins -quiet -hierarchical "*i_pll_dco*u_sel*Y*"]
-}
-if { $dco_obj != "" } {
-    puts "\[INFO] Defining ADPLL dco_clk on: $dco_obj"
-    create_clock -name dco_clk -period 2.0 $dco_obj
-    catch { set_clock_groups -asynchronous \
-        -group [get_clocks $clock_port] -group [get_clocks dco_clk] }
-} else {
-    puts "\[INFO] No ADPLL DCO port found; skipping dco_clk (build without ADPLL)."
-}
+# The ADPLL ring-DCO clock (pll_dco_clk) is a free-running self-timed oscillator that clocks
+# the frequency-measure counter. It is intentionally left undefined as an SDC clock: its source
+# is a combinational loop with no valid clock-tree root (defining it crashes TritonCTS), so STA
+# treats the small, async, observe-only counter domain as unconstrained. Its CDC into clk_i is
+# handled in RTL (Gray-coded). It is NOT routed to a pad (the analog pads can't carry routed
+# digital signals); observability is via the CSR STATUS register over Ethernet.
 
 if { [info exists ::env(OPENLANE_SDC_IDEAL_CLOCKS)] && $::env(OPENLANE_SDC_IDEAL_CLOCKS) } {
     unset_propagated_clock [all_clocks]

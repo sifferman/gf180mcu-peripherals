@@ -418,9 +418,10 @@ ring_dco #(
     .clk_o   (pll_dco_clk)
 );
 
-// Analog observation pads: [0] = DCO clock, [1] = lock.
-assign analog[0] = pll_dco_clk;
-assign analog[1] = pll_lock;
+// PLL observability is via the CSR STATUS register (lock + tune, read over Ethernet), not the
+// analog pads: the gf180 analog pads (asig_5p0) are not routed to internal digital logic by the
+// flow, so driving the DCO clock / lock onto them leaves the internal sinks open (LVS opens).
+// Leave the analog pads undriven; pll_dco_clk stays a normal internal net routed to the counter.
 
 // Bidir pad outputs (see pad map above)
 assign bidir_out[0]     = rmii_tx_en;
@@ -456,7 +457,7 @@ assign input_pd = '0;
 
 logic _unused;
 assign _unused = &{1'b0, led[7:4], input_in[NUM_INPUT_PADS-1:4],
-                   bidir_in[7:0], bidir_in[NUM_BIDIR_PADS-1:24]};
+                   bidir_in[7:0], bidir_in[NUM_BIDIR_PADS-1:24], analog};
 
 endmodule
 

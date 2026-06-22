@@ -24,7 +24,7 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-// adpll_freq_meas
+// adpll_freq_counter
 //
 // Shared front end for the ADPLL controllers: measures the DCO frequency by counting DCO
 // edges over a window of div_i reference (clk_i) cycles, and emits one measured-count
@@ -44,32 +44,32 @@
 
 `default_nettype none
 
-module adpll_freq_meas #(
-    parameter int unsigned CountWidth = 24,
-    parameter int unsigned DivWidth   = 16
+module adpll_freq_counter #(
+    parameter int unsigned EdgeCountWidth   = 24,
+    parameter int unsigned WindowCountWidth = 16
 ) (
-    input  wire                  clk_i,
-    input  wire                  rst_ni,
-    input  wire                  enable_i,
-    input  wire [DivWidth-1:0]   div_i,        // measurement window length, in clk_i cycles
-    input  wire                  dco_clk_i,
+    input  wire                         clk_i,
+    input  wire                         rst_ni,
+    input  wire                         enable_i,
+    input  wire [WindowCountWidth-1:0]  div_i,        // measurement window length, in clk_i cycles
+    input  wire                         dco_clk_i,
 
-    output wire [CountWidth-1:0] measured_o,   // DCO edges in the last completed window
-    output wire                  sample_valid_o
+    output wire [EdgeCountWidth-1:0]    measured_o,   // DCO edges in the last completed window
+    output wire                         sample_valid_o
 );
 
-function automatic logic [CountWidth-1:0] bin2gray(input logic [CountWidth-1:0] b);
+function automatic logic [EdgeCountWidth-1:0] bin2gray(input logic [EdgeCountWidth-1:0] b);
     bin2gray = b ^ (b >> 1);
 endfunction
-function automatic logic [CountWidth-1:0] gray2bin(input logic [CountWidth-1:0] g);
+function automatic logic [EdgeCountWidth-1:0] gray2bin(input logic [EdgeCountWidth-1:0] g);
     gray2bin = g;
-    for (int k_GEN = 1; k_GEN < CountWidth; k_GEN++)
+    for (int k_GEN = 1; k_GEN < EdgeCountWidth; k_GEN++)
         gray2bin = gray2bin ^ (g >> k_GEN);
 endfunction
 
 // DCO domain: Gray-coded free-running edge counter (async reset; clock is gated).
-logic [CountWidth-1:0] dco_cnt_bin_d,  dco_cnt_bin_q;
-logic [CountWidth-1:0] dco_cnt_gray_d, dco_cnt_gray_q;
+logic [EdgeCountWidth-1:0] dco_cnt_bin_d,  dco_cnt_bin_q;
+logic [EdgeCountWidth-1:0] dco_cnt_gray_d, dco_cnt_gray_q;
 always_comb dco_cnt_bin_d  = dco_cnt_bin_q + 1'b1;
 always_comb dco_cnt_gray_d = bin2gray(dco_cnt_bin_d);
 always_ff @(posedge dco_clk_i or negedge rst_ni) begin
@@ -83,8 +83,8 @@ always_ff @(posedge dco_clk_i or negedge rst_ni) begin
 end
 
 // Reference domain: two-flop Gray synchronizer.
-logic [CountWidth-1:0] gray_sync0_d, gray_sync0_q;
-logic [CountWidth-1:0] gray_sync1_d, gray_sync1_q;
+logic [EdgeCountWidth-1:0] gray_sync0_d, gray_sync0_q;
+logic [EdgeCountWidth-1:0] gray_sync1_d, gray_sync1_q;
 always_comb begin
     gray_sync0_d = dco_cnt_gray_q;
     gray_sync1_d = gray_sync0_q;
@@ -98,12 +98,12 @@ always_ff @(posedge clk_i or negedge rst_ni) begin
         gray_sync1_q <= gray_sync1_d;
     end
 end
-wire [CountWidth-1:0] dco_cnt_sync = gray2bin(gray_sync1_q);
+wire [EdgeCountWidth-1:0] dco_cnt_sync = gray2bin(gray_sync1_q);
 
 // Programmable measurement window: a clk_i counter that rolls over every div_i cycles.
-logic [DivWidth-1:0]   window_cnt_d,    window_cnt_q;
-logic [CountWidth-1:0] cnt_at_window_d, cnt_at_window_q;  // edge-count snapshot at window edge
-logic [CountWidth-1:0] measured_d,      measured_q;
+logic [WindowCountWidth-1:0]   window_cnt_d,    window_cnt_q;
+logic [EdgeCountWidth-1:0] cnt_at_window_d, cnt_at_window_q;  // edge-count snapshot at window edge
+logic [EdgeCountWidth-1:0] measured_d,      measured_q;
 logic                  sample_valid_d,  sample_valid_q;
 
 wire window_tick = (window_cnt_q >= div_i - 1'b1);

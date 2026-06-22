@@ -53,8 +53,8 @@
 
 module adpll_controller_linear #(
     parameter int unsigned NumTuneBits = 7,
-    parameter int unsigned CountWidth  = 24,
-    parameter int unsigned DivWidth    = 16,
+    parameter int unsigned EdgeCountWidth  = 24,
+    parameter int unsigned WindowCountWidth    = 16,
     parameter int unsigned LockWindows = 8,
     parameter int unsigned LockBand    = 2,    // linear loop dithers a little more than bang-bang
     // On a COARSE DCO the from-cold frequency error is huge (thousands of edges), so the
@@ -67,20 +67,20 @@ module adpll_controller_linear #(
     input  wire                   clk_i,
     input  wire                   rst_ni,
     input  wire                   enable_i,
-    input  wire [CountWidth-1:0]  mul_i,
-    input  wire [DivWidth-1:0]    div_i,
+    input  wire [EdgeCountWidth-1:0]  mul_i,
+    input  wire [WindowCountWidth-1:0]    div_i,
     input  wire                   dco_clk_i,
 
     output wire [NumTuneBits-1:0] tune_o,
     output wire                   lock_o
 );
 
-wire [CountWidth-1:0] measured;
+wire [EdgeCountWidth-1:0] measured;
 wire                  sample_valid;
 
-adpll_freq_meas #(
-    .CountWidth(CountWidth),
-    .DivWidth  (DivWidth)
+adpll_freq_counter #(
+    .EdgeCountWidth(EdgeCountWidth),
+    .WindowCountWidth  (WindowCountWidth)
 ) u_meas (
     .clk_i,
     .rst_ni,
@@ -97,7 +97,7 @@ localparam int unsigned AccWidth = NumTuneBits + BetaShift + 4;
 logic signed [AccWidth-1:0]   acc_q;
 logic [NumTuneBits-1:0]        tune_q;
 
-wire signed [CountWidth+1:0] error = $signed({2'b0, measured}) - $signed({2'b0, mul_i});
+wire signed [EdgeCountWidth+1:0] error = $signed({2'b0, measured}) - $signed({2'b0, mul_i});
 
 // Integral accumulator step with anti-windup: keep beta*acc inside the tune range.
 localparam logic signed [AccWidth-1:0] AccMax = AccWidth'(TuneMax) <<< BetaShift;
@@ -106,7 +106,7 @@ wire signed [AccWidth-1:0] acc_step = (acc_sum < 0)      ? '0     :
                                       (acc_sum > AccMax) ? AccMax : acc_sum;
 
 // PI output: ctrl = alpha*e + beta*acc (gains are arithmetic right shifts).
-wire signed [CountWidth+1:0] prop_term  = error >>> AlphaShift;
+wire signed [EdgeCountWidth+1:0] prop_term  = error >>> AlphaShift;
 wire signed [AccWidth-1:0]   integ_term = acc_step >>> BetaShift;
 wire signed [AccWidth+1:0]   ctrl       = (AccWidth+2)'(prop_term) + (AccWidth+2)'(integ_term);
 

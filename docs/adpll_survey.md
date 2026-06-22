@@ -27,7 +27,7 @@ A programmable-ratio frequency synthesizer, the canonical ADPLL pipeline
 
 ```
             +-------------------+   +-----------+   +-----+
-  F_clk_i ->| adpll_freq_meas   |-->| loop      |-->| ring|--> clk_o (F_DCO)
+  F_clk_i ->| adpll_freq_counter   |-->| loop      |-->| ring|--> clk_o (F_DCO)
             | (edge count over  |   | filter    |   | DCO |--+
             |  div_i cycles)    |   |(adpll_controller_bangbang|   +-----+  |
             +-------------------+   | _*)       |            |
@@ -47,7 +47,7 @@ temperature (PVT) variations."* A second-order (type-II) loop suffices: [Kratyuk
 
 | module | role |
 |---|---|
-| `adpll_freq_meas` | Gray-coded DCO-edge counter sampled over a runtime `div_i`-cycle window; frequency-to-digital front end. Shared by all controllers. |
+| `adpll_freq_counter` | Gray-coded DCO-edge counter sampled over a runtime `div_i`-cycle window; frequency-to-digital front end. Shared by all controllers. |
 | `adpll_lock_detect` | declares lock when the watched control code holds a ±`Band` window for `LockWindows` samples. Shared. |
 
 ## DCO variants (interface `enable_i`, `tune_i[NumTuneBits-1:0]`, `clk_o`)
@@ -70,7 +70,7 @@ current DAC.
 
 ## Controller variants (interface `clk_i,rst_ni,enable_i,mul_i,div_i,dco_clk_i → tune_o,lock_o`)
 
-Both reuse `adpll_freq_meas` + `adpll_lock_detect`; only the loop filter differs. Both are
+Both reuse `adpll_freq_counter` + `adpll_lock_detect`; only the loop filter differs. Both are
 proportional-integral (PI): [Kratyuk2007 §IV-C] *"A digital equivalent of an analog loop
 filter consists of a proportional path with a gain α and an integral path with a gain β."*
 

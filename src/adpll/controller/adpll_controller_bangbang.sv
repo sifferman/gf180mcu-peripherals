@@ -37,7 +37,7 @@
 // window length) are runtime inputs, so the ratio is set over Ethernet via a CSR.
 //
 // Pipeline (each block its own module for reuse):
-//   adpll_freq_meas  -- counts DCO edges over a div_i-cycle window, Gray-CDC into clk_i,
+//   adpll_freq_counter  -- counts DCO edges over a div_i-cycle window, Gray-CDC into clk_i,
 //                       emits measured + sample strobe (the frequency-to-digital front end).
 //   this module      -- the loop filter.
 //   adpll_lock_detect-- declares lock when the operating point settles.
@@ -72,8 +72,8 @@
 
 module adpll_controller_bangbang #(
     parameter int unsigned NumTuneBits      = 7,
-    parameter int unsigned CountWidth       = 24,
-    parameter int unsigned DivWidth         = 16,
+    parameter int unsigned EdgeCountWidth       = 24,
+    parameter int unsigned WindowCountWidth         = 16,
     parameter int unsigned LockWindows      = 8,
     parameter int unsigned IntegralGain     = 1,
     parameter int unsigned ProportionalGain = 1
@@ -81,20 +81,20 @@ module adpll_controller_bangbang #(
     input  wire                   clk_i,
     input  wire                   rst_ni,
     input  wire                   enable_i,
-    input  wire [CountWidth-1:0]  mul_i,      // target DCO edges per window (multiply ratio N)
-    input  wire [DivWidth-1:0]    div_i,      // measurement window length (reference divider M)
+    input  wire [EdgeCountWidth-1:0]  mul_i,      // target DCO edges per window (multiply ratio N)
+    input  wire [WindowCountWidth-1:0]    div_i,      // measurement window length (reference divider M)
     input  wire                   dco_clk_i,
 
     output wire [NumTuneBits-1:0] tune_o,
     output wire                   lock_o
 );
 
-wire [CountWidth-1:0] measured;
+wire [EdgeCountWidth-1:0] measured;
 wire                  sample_valid;
 
-adpll_freq_meas #(
-    .CountWidth(CountWidth),
-    .DivWidth  (DivWidth)
+adpll_freq_counter #(
+    .EdgeCountWidth(EdgeCountWidth),
+    .WindowCountWidth  (WindowCountWidth)
 ) u_meas (
     .clk_i,
     .rst_ni,

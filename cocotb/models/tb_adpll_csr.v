@@ -36,7 +36,7 @@ module tb_adpll_csr;
   wire [NUM_TUNE-1:0] tune;
   wire                dco_clk;
 
-  adpll_csr #(.NumTuneBits(NUM_TUNE), .CountWidth(CNT_W), .DivWidth(DIV_W)) u_csr (
+  adpll_csr #(.NumTuneBits(NUM_TUNE), .EdgeCountWidth(CNT_W), .WindowCountWidth(DIV_W)) u_csr (
       .clk_i(clk), .rst_ni(rst_n),
       .s_axil_awaddr(awaddr), .s_axil_awprot(3'b0), .s_axil_awvalid(awvalid), .s_axil_awready(awready),
       .s_axil_wdata(wdata), .s_axil_wstrb(4'hF), .s_axil_wvalid(wvalid), .s_axil_wready(wready),
@@ -46,7 +46,7 @@ module tb_adpll_csr;
       .enable_o(enable), .mul_o(mul), .div_o(div), .lock_i(lock), .tune_i(tune)
   );
 
-  adpll_controller_bangbang #(.NumTuneBits(NUM_TUNE), .CountWidth(CNT_W), .DivWidth(DIV_W)) u_ctrl (
+  adpll_controller_bangbang #(.NumTuneBits(NUM_TUNE), .EdgeCountWidth(CNT_W), .WindowCountWidth(DIV_W)) u_ctrl (
       .clk_i(clk), .rst_ni(rst_n), .enable_i(enable),
       .mul_i(mul), .div_i(div), .dco_clk_i(dco_clk),
       .tune_o(tune), .lock_o(lock)

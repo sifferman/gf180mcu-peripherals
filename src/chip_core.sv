@@ -364,8 +364,8 @@ wire        pll_dco_clk;
 
 adpll_csr #(
     .NumTuneBits(7),
-    .CountWidth (24),
-    .DivWidth   (16)
+    .EdgeCountWidth (24),
+    .WindowCountWidth   (16)
 ) i_pll_csr (
     .clk_i (clk),
     .rst_ni(rst_n),
@@ -397,8 +397,8 @@ adpll_csr #(
 
 adpll_controller_bangbang #(
     .NumTuneBits(7),
-    .CountWidth (24),
-    .DivWidth   (16)
+    .EdgeCountWidth (24),
+    .WindowCountWidth   (16)
 ) i_pll_ctrl (
     .clk_i    (clk),
     .rst_ni   (rst_n),

@@ -38,14 +38,14 @@
 
 module adpll_bangbang_binary #(
     parameter int unsigned NumTuneBits = 7,
-    parameter int unsigned CountWidth  = 24,
-    parameter int unsigned DivWidth    = 16
+    parameter int unsigned EdgeCountWidth  = 24,
+    parameter int unsigned WindowCountWidth    = 16
 ) (
     input  wire                   clk_i,
     input  wire                   rst_ni,
     input  wire                   enable_i,
-    input  wire [CountWidth-1:0]  mul_i,
-    input  wire [DivWidth-1:0]    div_i,
+    input  wire [EdgeCountWidth-1:0]  mul_i,
+    input  wire [WindowCountWidth-1:0]    div_i,
 
     output wire                   lock_o,
     output wire [NumTuneBits-1:0] tune_o,
@@ -57,8 +57,8 @@ wire                   dco_clk;
 
 adpll_controller_bangbang #(
     .NumTuneBits(NumTuneBits),
-    .CountWidth (CountWidth),
-    .DivWidth   (DivWidth)
+    .EdgeCountWidth (EdgeCountWidth),
+    .WindowCountWidth   (WindowCountWidth)
 ) u_ctrl (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),

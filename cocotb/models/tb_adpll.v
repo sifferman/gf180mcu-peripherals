@@ -40,9 +40,9 @@ module tb_adpll;
 `endif
 
 `ifdef CTRL_LINEAR
-  adpll_controller_linear #(.NumTuneBits(NUM_TUNE), .CountWidth(CNT_W), .DivWidth(DIV_W)) u_ctrl (
+  adpll_controller_linear #(.NumTuneBits(NUM_TUNE), .EdgeCountWidth(CNT_W), .WindowCountWidth(DIV_W)) u_ctrl (
 `else
-  adpll_controller_bangbang        #(.NumTuneBits(NUM_TUNE), .CountWidth(CNT_W), .DivWidth(DIV_W)) u_ctrl (
+  adpll_controller_bangbang        #(.NumTuneBits(NUM_TUNE), .EdgeCountWidth(CNT_W), .WindowCountWidth(DIV_W)) u_ctrl (
 `endif
       .clk_i(clk), .rst_ni(rst_n), .enable_i(enable),
       .mul_i(CNT_W'(MUL)), .div_i(DIV_W'(DIV)), .dco_clk_i(dco_clk),

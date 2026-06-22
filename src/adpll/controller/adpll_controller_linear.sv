@@ -78,7 +78,7 @@ wire                  sample_valid;
 adpll_freq_counter #(
     .MaxEdgesPerWindow(MaxEdgesPerWindow),
     .MaxWindowSize(MaxWindowSize)
-) u_meas (
+) adpll_freq_counter (
     .clk_i,
     .rst_ni,
     .enable_i,
@@ -100,6 +100,10 @@ logic [NumTuneBits-1:0]     tune_d, tune_q;                // PI output to the D
 function automatic int clamp(int lo, int value, int hi);
     clamp = (value < lo) ? lo : (value > hi) ? hi : value;
 endfunction
+
+// control_word ([AccWidth+1:0]) is clamped as `int`; statically guard it fits.
+if (AccWidth + 2 > $bits(int))
+    $error("adpll_controller_linear: AccWidth (NumTuneBits + BetaShift) too large for int arithmetic");
 
 // PI loop filter; update only on a fresh measurement (gating lives in _d, not the always_ff).
 always_comb begin
@@ -134,7 +138,7 @@ adpll_lock_detect #(
     .Width      (NumTuneBits),
     .LockWindows(LockWindows),
     .Band       (LockBand)
-) u_lock (
+) adpll_lock_detect (
     .clk_i,
     .rst_ni,
     .enable_i,

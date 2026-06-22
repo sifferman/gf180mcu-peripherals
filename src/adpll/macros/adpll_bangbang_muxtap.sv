@@ -64,7 +64,7 @@ adpll_controller_bangbang #(
     .NumTuneBits(NumTuneBits),
     .MaxEdgesPerWindow(MaxEdgesPerWindow),
     .MaxWindowSize(MaxWindowSize)
-) u_ctrl (
+) adpll_controller_bangbang (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (enable_i),
@@ -77,7 +77,7 @@ adpll_controller_bangbang #(
 
 ring_dco_muxtap #(
     .NumTuneBits(NumTuneBits)
-) u_dco (
+) ring_dco_muxtap (
     .enable_i(enable_i),
     .tune_i  (tune),
     .clk_o   (dco_clk)

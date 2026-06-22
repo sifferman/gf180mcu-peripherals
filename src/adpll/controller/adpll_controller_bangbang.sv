@@ -47,21 +47,22 @@
 //   - lock_o    : lock asserted
 
 module adpll_controller_bangbang #(
-    parameter int unsigned NumTuneBits      = 7,
+    parameter  int unsigned NumTuneBits      = 7,
     parameter  int unsigned MaxEdgesPerWindow = (1 << 24) - 1,
     localparam int unsigned EdgeCountWidth    = $clog2(MaxEdgesPerWindow + 1),
     parameter  int unsigned MaxWindowSize     = (1 << 16) - 1,
     localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1),
-    parameter int unsigned LockWindows      = 8,
-    parameter int unsigned IntegralGain     = 1,
-    parameter int unsigned ProportionalGain = 1
+    parameter  int unsigned LockWindows      = 8,
+    parameter  int unsigned IntegralGain     = 1,
+    parameter  int unsigned ProportionalGain = 1
 ) (
-    input  wire                   clk_i,
-    input  wire                   rst_ni,
-    input  wire                   enable_i,
+    input  wire                       clk_i,
+    input  wire                       rst_ni,
+
+    input  wire                       enable_i,
     input  wire [EdgeCountWidth-1:0]  mul_i,      // target DCO edges per window (multiply ratio N)
-    input  wire [WindowSizeWidth-1:0]    div_i,      // measurement window length (reference divider M)
-    input  wire                   dco_clk_i,
+    input  wire [WindowSizeWidth-1:0] div_i,      // measurement window length (reference divider M)
+    input  wire                       dco_clk_i,
 
     output wire [NumTuneBits-1:0] tune_o,
     output wire                   lock_o
@@ -73,7 +74,7 @@ wire                  sample_valid;
 adpll_freq_counter #(
     .MaxEdgesPerWindow(MaxEdgesPerWindow),
     .MaxWindowSize(MaxWindowSize)
-) u_meas (
+) adpll_freq_counter (
     .clk_i,
     .rst_ni,
     .enable_i,
@@ -96,8 +97,13 @@ function automatic int clamp(int lo, int value, int hi);
     clamp = (value < lo) ? lo : (value > hi) ? hi : value;
 endfunction
 
+// The PI update is computed as `int`; statically guard that its operands
+// (integral_q + error_sign * gain, max magnitude TuneMax + gain) cannot overflow it.
+if ($clog2(TuneMax + IntegralGain + ProportionalGain + 1) + 1 > $bits(int))
+    $error("adpll_controller_bangbang: NumTuneBits/gains too large for int PI arithmetic");
+
 // 1-bit (sign) frequency error: +1 too fast, -1 too slow, 0 on target.
-wire signed [1:0] error_sign = too_fast ? 2'sd1 : (too_slow ? -2'sd1 : 2'sd0);
+wire signed [1:0] error_sign = too_fast ? 1 : (too_slow ? -1 : 0);
 
 // PI loop filter; update only on a fresh measurement (gating lives in _d, not the always_ff).
 always_comb begin
@@ -124,7 +130,7 @@ adpll_lock_detect #(
     .Width      (NumTuneBits),
     .LockWindows(LockWindows),
     .Band       (1)
-) u_lock (
+) adpll_lock_detect (
     .clk_i,
     .rst_ni,
     .enable_i,

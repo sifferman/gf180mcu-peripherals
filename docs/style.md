@@ -71,6 +71,11 @@ it is recorded here so the same mistake isn't repeated.
   even for a two-pin cell. Keeps diffs minimal and every connection greppable.
   Use named connections (`.port(sig)`); the `.clk_i` implicit-connect shorthand
   (`.clk_i(clk_i)`) is fine, one per line.
+- **A module instantiated once in its scope takes the module's name as its
+  instance name** — `adpll_freq_counter adpll_freq_counter (…)`, not `u_meas`.
+  Only give a distinct instance name when there are several of the same module
+  in one scope (then name by role: `i_ic`, `i_ic_top`). (Doesn't apply to PDK
+  std-cell primitives, whose type name is impractically long.)
 
 ## Anti-patterns to avoid
 
@@ -119,6 +124,11 @@ it is recorded here so the same mistake isn't repeated.
 - **Name the parameter for the thing it bounds, specifically.** `EdgeCountWidth`
   (the DCO edge count), not `CountWidth` ("count of what?"); a *size* is
   `…Size`/`…Length`, never `…Count` (which reads as "how many").
+- **Guard fixed-width arithmetic with an elaboration-time assertion.** When math
+  is evaluated in a fixed type (e.g. `int` inside a function), add a static check
+  that the parameterization can't overflow it, and `$error` if it can:
+  `if ($clog2(MaxValue + 1) + 1 > $bits(int)) $error("…");` (a bare
+  `if (cond) $error(...)` module item fires at elaboration).
 
 ## File headers
 

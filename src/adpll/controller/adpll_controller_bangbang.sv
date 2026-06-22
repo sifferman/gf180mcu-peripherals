@@ -88,38 +88,34 @@ wire too_slow = measured < mul_i;   // freq low  => cut delay  => lower tune
 
 localparam int unsigned TuneMax = (1 << NumTuneBits) - 1;
 
-logic [NumTuneBits-1:0] integ_q;    // integral path: the operating-point code
-logic [NumTuneBits-1:0] tune_q;     // registered PI output (stable per window)
+logic [NumTuneBits-1:0] integral_d, integral_q;   // integral path: the operating-point code
+logic [NumTuneBits-1:0] tune_d, tune_q;           // PI output to the DCO (integral + proportional)
 
-function automatic logic [NumTuneBits-1:0] clamp(input int v);
-    if (v < 0)                  clamp = '0;
-    else if (v > int'(TuneMax)) clamp = NumTuneBits'(TuneMax);
-    else                        clamp = NumTuneBits'(v);
+// Standard 3-argument clamp: min(max(lo, value), hi).
+function automatic int clamp(int lo, int value, int hi);
+    clamp = (value < lo) ? lo : (value > hi) ? hi : value;
 endfunction
 
-// PI loop filter. dir is the 1-bit (sign) error; *_step is the next code on a sample.
-wire signed [1:0]      dir         = too_fast ? 2'sd1 : (too_slow ? -2'sd1 : 2'sd0);
-wire [NumTuneBits-1:0] integ_step  = clamp(int'(integ_q)    + dir * int'(IntegralGain));
-wire [NumTuneBits-1:0] tune_step   = clamp(int'(integ_step) + dir * int'(ProportionalGain));
+// 1-bit (sign) frequency error: +1 too fast, -1 too slow, 0 on target.
+wire signed [1:0] error_sign = too_fast ? 2'sd1 : (too_slow ? -2'sd1 : 2'sd0);
 
-// Update only on a fresh measurement; the gating lives here in _d, not in the always_ff.
-logic [NumTuneBits-1:0] integ_d, tune_d;
+// PI loop filter; update only on a fresh measurement (gating lives in _d, not the always_ff).
 always_comb begin
-    integ_d = integ_q;
-    tune_d  = tune_q;
+    integral_d = integral_q;
+    tune_d     = tune_q;
     if (enable_i && sample_valid) begin
-        integ_d = integ_step;
-        tune_d  = tune_step;
+        integral_d = NumTuneBits'(clamp(0, int'(integral_q) + error_sign * int'(IntegralGain),     int'(TuneMax)));
+        tune_d     = NumTuneBits'(clamp(0, int'(integral_d) + error_sign * int'(ProportionalGain), int'(TuneMax)));
     end
 end
 
 always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-        integ_q <= {NumTuneBits{1'b0}};
-        tune_q  <= {NumTuneBits{1'b0}};
+        integral_q <= '0;
+        tune_q     <= '0;
     end else begin
-        integ_q <= integ_d;
-        tune_q  <= tune_d;
+        integral_q <= integral_d;
+        tune_q     <= tune_d;
     end
 end
 
@@ -133,11 +129,10 @@ adpll_lock_detect #(
     .rst_ni,
     .enable_i,
     .sample_valid_i(sample_valid),
-    .code_i        (integ_q),
+    .code_i        (integral_q),
     .lock_o        (lock_o)
 );
 
 assign tune_o = tune_q;
 
 endmodule
-

@@ -46,13 +46,13 @@
 //   - lock_o       : lock asserted
 
 module adpll_controller_linear #(
-    parameter int unsigned NumTuneBits = 7,
+    parameter  int unsigned NumTuneBits = 7,
     parameter  int unsigned MaxEdgesPerWindow = (1 << 24) - 1,
     localparam int unsigned EdgeCountWidth    = $clog2(MaxEdgesPerWindow + 1),
     parameter  int unsigned MaxWindowSize     = (1 << 16) - 1,
     localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1),
-    parameter int unsigned LockWindows = 8,
-    parameter int unsigned LockBand    = 2,    // linear loop dithers a little more than bang-bang
+    parameter  int unsigned LockWindows = 8,
+    parameter  int unsigned LockBand    = 2,    // linear loop dithers a little more than bang-bang
     // On a COARSE DCO the from-cold frequency error is huge (thousands of edges), so the
     // proportional gain must be tiny or it slams tune to a rail and the loop oscillates
     // rail-to-rail. Hence alpha is small (integral-dominant acquisition); the proportional
@@ -60,15 +60,16 @@ module adpll_controller_linear #(
     parameter int unsigned AlphaShift  = 10,   // proportional gain alpha = 2^-AlphaShift
     parameter int unsigned BetaShift   = 8     // integral gain    beta  = 2^-BetaShift
 ) (
-    input  wire                   clk_i,
-    input  wire                   rst_ni,
-    input  wire                   enable_i,
-    input  wire [EdgeCountWidth-1:0]  mul_i,
-    input  wire [WindowSizeWidth-1:0]    div_i,
-    input  wire                   dco_clk_i,
+    input  wire                       clk_i,
+    input  wire                       rst_ni,
 
-    output wire [NumTuneBits-1:0] tune_o,
-    output wire                   lock_o
+    input  wire                       enable_i,
+    input  wire [EdgeCountWidth-1:0]  mul_i,
+    input  wire [WindowSizeWidth-1:0] div_i,
+    input  wire                       dco_clk_i,
+
+    output wire [NumTuneBits-1:0]     tune_o,
+    output wire                       lock_o
 );
 
 wire [EdgeCountWidth-1:0] measured;
@@ -89,49 +90,42 @@ adpll_freq_counter #(
 
 localparam int unsigned TuneMax  = (1 << NumTuneBits) - 1;
 localparam int unsigned AccWidth = NumTuneBits + BetaShift + 4;
-
-logic signed [AccWidth-1:0]   acc_q;
-logic [NumTuneBits-1:0]        tune_q;
-
-wire signed [EdgeCountWidth+1:0] error = $signed({2'b0, measured}) - $signed({2'b0, mul_i});
-
-// Integral accumulator step with anti-windup: keep beta*acc inside the tune range.
+// Anti-windup limit: keep beta*accumulator inside the tune range.
 localparam logic signed [AccWidth-1:0] AccMax = AccWidth'(TuneMax) <<< BetaShift;
-wire signed [AccWidth-1:0] acc_sum  = acc_q + AccWidth'(error);
-wire signed [AccWidth-1:0] acc_step = (acc_sum < 0)      ? '0     :
-                                      (acc_sum > AccMax) ? AccMax : acc_sum;
 
-// PI output: ctrl = alpha*e + beta*acc (gains are arithmetic right shifts).
-wire signed [EdgeCountWidth+1:0] prop_term  = error >>> AlphaShift;
-wire signed [AccWidth-1:0]   integ_term = acc_step >>> BetaShift;
-wire signed [AccWidth+1:0]   ctrl       = (AccWidth+2)'(prop_term) + (AccWidth+2)'(integ_term);
+logic signed [AccWidth-1:0] accumulator_d, accumulator_q;  // integral accumulator (anti-windup)
+logic [NumTuneBits-1:0]     tune_d, tune_q;                // PI output to the DCO
 
-function automatic logic [NumTuneBits-1:0] clamp(input logic signed [AccWidth+1:0] v);
-    if (v < 0)                            clamp = '0;
-    else if (v > (AccWidth+2)'(TuneMax))  clamp = NumTuneBits'(TuneMax);
-    else                                  clamp = NumTuneBits'(v);
+// Standard 3-argument clamp: min(max(lo, value), hi).
+function automatic int clamp(int lo, int value, int hi);
+    clamp = (value < lo) ? lo : (value > hi) ? hi : value;
 endfunction
-wire [NumTuneBits-1:0] tune_step = clamp(ctrl);
 
-// Update only on a fresh measurement; the gating lives here in _d, not in the always_ff.
-logic signed [AccWidth-1:0] acc_d;
-logic [NumTuneBits-1:0]     tune_d;
+// PI loop filter; update only on a fresh measurement (gating lives in _d, not the always_ff).
 always_comb begin
-    acc_d  = acc_q;
-    tune_d = tune_q;
+    logic signed [EdgeCountWidth+1:0] error;             // signed frequency error (edges/window)
+    logic signed [AccWidth-1:0]       accumulator_sum;
+    logic signed [AccWidth+1:0]       control_word;      // alpha*error + beta*accumulator
+    accumulator_d = accumulator_q;
+    tune_d        = tune_q;
     if (enable_i && sample_valid) begin
-        acc_d  = acc_step;
-        tune_d = tune_step;
+        error           = $signed({2'b0, measured}) - $signed({2'b0, mul_i});
+        accumulator_sum = accumulator_q + AccWidth'(error);
+        accumulator_d   = (accumulator_sum < 0)      ? '0 :
+                          (accumulator_sum > AccMax) ? AccMax : accumulator_sum;
+        // gains are arithmetic right shifts (alpha = 2^-AlphaShift, beta = 2^-BetaShift)
+        control_word    = (AccWidth+2)'(error >>> AlphaShift) + (AccWidth+2)'(accumulator_d >>> BetaShift);
+        tune_d          = NumTuneBits'(clamp(0, int'(control_word), int'(TuneMax)));
     end
 end
 
 always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-        acc_q  <= '0;
-        tune_q <= {NumTuneBits{1'b0}};
+        accumulator_q <= '0;
+        tune_q        <= '0;
     end else begin
-        acc_q  <= acc_d;
-        tune_q <= tune_d;
+        accumulator_q <= accumulator_d;
+        tune_q        <= tune_d;
     end
 end
 
@@ -152,4 +146,3 @@ adpll_lock_detect #(
 assign tune_o = tune_q;
 
 endmodule
-

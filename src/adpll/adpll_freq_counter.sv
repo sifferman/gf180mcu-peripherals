@@ -97,7 +97,8 @@ always_ff @(posedge clk_i or negedge rst_ni) begin
         gray_sync1_q <= gray_sync1_d;
     end
 end
-wire [EdgeCountWidth-1:0] dco_cnt_sync = gray2bin(gray_sync1_q);
+logic [EdgeCountWidth-1:0] dco_cnt_sync;
+always_comb dco_cnt_sync = gray2bin(gray_sync1_q);
 
 // Programmable measurement window: a clk_i counter that rolls over every div_i cycles.
 logic [WindowSizeWidth-1:0]   window_cnt_d,    window_cnt_q;

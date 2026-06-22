@@ -3,6 +3,9 @@
 The lowRISC Verilog Coding Style guide is the official reference.
 Everything below is either an excerpt, an emphasis, or a project-specific rule.
 
+This is a **living document**: whenever a style decision or correction is made,
+it is recorded here so the same mistake isn't repeated.
+
 ## Names
 
 - **Self-documenting**. Variable and function names should make comments
@@ -28,6 +31,17 @@ Everything below is either an excerpt, an emphasis, or a project-specific rule.
   `_d` (`_d = en ? next : _q`), never `if (en) _q <= …` in the `always_ff`.
   (The one pragmatic exception is a RAM write port — a memory array has no
   `_d` shadow, so `if (we) mem[addr] <= wdata` stays in the `always_ff`.)
+- **No abbreviations.** Spell the word out: `controller` not `ctrl`,
+  `integral` not `integ`, `accumulator` not `acc`, `frequency` not `freq`
+  (in prose). The only allowed short forms are universally understood ones:
+  `clk`, `rst`, `dco`, `addr`, and standard protocol/acronym names
+  (`axi`, `udp`, `rmii`, …). If a reader has to pause to expand it, don't abbreviate it.
+- **Declare each flip-flop on one line, `_d` before `_q`**:
+  `logic [NumTuneBits-1:0] integral_d, integral_q;` — never split the pair
+  across two declarations.
+- **Module names are nouns**, naming the *thing* the block is, not an action:
+  `adpll_freq_counter`, not `adpll_measure_freq`. Pick the textbook noun where
+  one exists (a windowed edge counter is a "counter," not a "measurer").
 
 ## Modules
 
@@ -70,8 +84,52 @@ Everything below is either an excerpt, an emphasis, or a project-specific rule.
 ## Pure functions and constants
 
 - Prefer `localparam` over `parameter` for module-internal constants.
-- Prefer `wire` (continuous assign) over `always_comb` if the logic is
-  a pure function (no priority chain).
+- Prefer `wire` (continuous assign) over `always_comb` for simple
+  expressions/muxes (no priority chain).
+- **Call a SystemVerilog `function` only inside an `always_comb` block, never
+  in a continuous `assign`/`wire =`.** Continuous assigns are for operators and
+  selects; anything that invokes a `function` (e.g. `clamp`, `gray2bin`) lives
+  in `always_comb`.
+- **Helper functions take their conventional signature.** `clamp` is
+  three-argument — `clamp(lo, value, hi)` returning `min(max(lo, value), hi)` —
+  not a one-argument form that reaches module-scope bounds.
+- **Use `'0` for an all-zero value**, not `{Width{1'b0}}`. (Likewise `'1`,
+  and `'x` for sim-only don't-cares.)
+
+## Time and compiler directives
+
+- **No `` `timescale `` and no `` `default_nettype `` in source** (RTL or
+  testbench). Supply simulation precision at the *tool* level instead — cocotb's
+  `runner.build(timescale=…)`, and a single compiled-first precision file for
+  standalone iverilog targets. (iverilog with no timescale defaults precision to
+  1 s and silently rounds `ns` delays to zero — so the precision must come from
+  the flow, not be missing entirely.)
+- **Every `#` delay carries an explicit time-unit literal**: `#(20ns)`, never
+  `#20`. A delay must not depend on an ambient `` `timescale ``.
+- **A parameter or variable that holds a time is typed `realtime`** and built
+  from time literals, e.g. `localparam realtime HalfPeriod = 1.0ns;`.
+
+## Parameterization
+
+- **Parameterize by the physical quantity, derive the bit-width.** Expose the
+  operating envelope (`MaxEdgesPerWindow`, `MaxWindowSize`) as the `parameter`
+  and compute the width with a `localparam`:
+  `localparam int unsigned EdgeCountWidth = $clog2(MaxEdgesPerWindow + 1);`.
+  A bare `…Width = 24` parameter hides what it's for.
+- **Name the parameter for the thing it bounds, specifically.** `EdgeCountWidth`
+  (the DCO edge count), not `CountWidth` ("count of what?"); a *size* is
+  `…Size`/`…Length`, never `…Count` (which reads as "how many").
+
+## File headers
+
+Keep the module header short: the BSD license block, then
+- one **citation** line — the work + chapter the design is drawn from (cite the
+  work itself, e.g. "Staszewski & Balsara, Wiley 2006, Ch. 3" — **never** a path
+  into a local `reference/` tree, which is not committed);
+- **1–2 sentences** on what the block does;
+- a bulleted **Parameters** list and a bulleted **Ports** list.
+
+No multi-paragraph derivations or block quotes in the header.
 
 ## File organization
 

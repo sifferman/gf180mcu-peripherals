@@ -6,7 +6,7 @@
 //   default              : adpll_controller_bangbang (bang-bang PI) + ring_dco_binary (binary)
 //   -DCTRL_LINEAR         : adpll_controller_linear (linear PI)
 //   -DCTRL_GEARSHIFT      : adpll_controller_gearshift (adaptive-step bang-bang)
-//   -DDCO_THERM / -DDCO_MUXTAP : the thermometer / mux-tap DCO
+//   -DDCO_THERM / -DDCO_MUXTAP / -DDCO_COARSEFINE : thermometer / mux-tap / coarse-fine DCO
 //
 // The controller drives F_DCO = (mul/div)*F_ref. With the behavioural DCO (half-period
 // 1.0+0.1*tune ns) and a 25 MHz reference, mul=1707/div=256 targets tune ~= 20. Reports
@@ -34,6 +34,8 @@ module tb_adpll;
   ring_dco_thermometer #(.NumTuneBits(NUM_TUNE)) u_dco (
 `elsif DCO_MUXTAP
   ring_dco_muxtap #(.NumTuneBits(NUM_TUNE)) u_dco (
+`elsif DCO_COARSEFINE
+  ring_dco_coarsefine #(.NumTuneBits(NUM_TUNE)) u_dco (
 `else
   ring_dco_binary #(.NumTuneBits(NUM_TUNE)) u_dco (
 `endif

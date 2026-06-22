@@ -175,11 +175,11 @@ sim-adpll-survey: ## Compare the ADPLL controller variants (bang-bang / linear /
 	done
 .PHONY: sim-adpll-survey
 
-sim-adpll-matrix: ## Verify ALL 9 ADPLL variants (3 controllers x 3 DCOs): lock time + settled tune
+sim-adpll-matrix: ## Verify ALL 12 ADPLL variants (3 controllers x 4 DCOs): lock time + settled tune
 	@mkdir -p cocotb/sim_build
 	@printf "%-26s %-12s %-8s %s\n" "config (ctrl x dco)" "lock_cyc" "tune" "result"
 	@for ctrl in "bb:" "lin:-DCTRL_LINEAR" "gear:-DCTRL_GEARSHIFT"; do \
-		for dco in "binary:" "therm:-DDCO_THERM" "muxtap:-DDCO_MUXTAP"; do \
+		for dco in "binary:" "therm:-DDCO_THERM" "muxtap:-DDCO_MUXTAP" "cfine:-DDCO_COARSEFINE"; do \
 			cn=$${ctrl%%:*}; cd=$${ctrl#*:}; dn=$${dco%%:*}; dd=$${dco#*:}; \
 			iverilog -g2012 $$cd $$dd -o cocotb/sim_build/tb_mx_$${cn}_$${dn} $(ADPLL_TS) $(ADPLL_RTL) cocotb/models/tb_adpll.v 2>/dev/null && \
 			out=$$(vvp cocotb/sim_build/tb_mx_$${cn}_$${dn} 2>/dev/null); \

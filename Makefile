@@ -174,6 +174,22 @@ sim-adpll-survey: ## Compare the ADPLL controller variants (bang-bang PI vs line
 	done
 .PHONY: sim-adpll-survey
 
+sim-adpll-matrix: ## Verify ALL 6 ADPLL variants (2 controllers x 3 DCOs): lock time + settled tune
+	@mkdir -p cocotb/sim_build
+	@printf "%-26s %-12s %-8s %s\n" "config (ctrl x dco)" "lock_cyc" "tune" "result"
+	@for ctrl in "bb:" "lin:-DCTRL_LINEAR"; do \
+		for dco in "binary:" "therm:-DDCO_THERM" "muxtap:-DDCO_MUXTAP"; do \
+			cn=$${ctrl%%:*}; cd=$${ctrl#*:}; dn=$${dco%%:*}; dd=$${dco#*:}; \
+			iverilog -g2012 $$cd $$dd -o cocotb/sim_build/tb_mx_$${cn}_$${dn} $(ADPLL_RTL) cocotb/models/tb_adpll.v 2>/dev/null && \
+			out=$$(vvp cocotb/sim_build/tb_mx_$${cn}_$${dn} 2>/dev/null); \
+			cyc=$$(echo "$$out" | grep -oE "lock_time=[0-9]+" | grep -oE "[0-9]+"); \
+			tune=$$(echo "$$out" | grep -oE "tune=[0-9]+ in-range" | grep -oE "[0-9]+"); \
+			res=$$(echo "$$out" | grep -oE "PASS|FAIL" | head -1); \
+			printf "%-26s %-12s %-8s %s\n" "$$cn x $$dn" "$${cyc:-N/A}" "$${tune:-N/A}" "$${res:-NO-LOCK}"; \
+		done; \
+	done
+.PHONY: sim-adpll-matrix
+
 # ngspice >= 42 is required for the gf180 BSIM4 models (mulu0 et al); override NGSPICE
 # to point at a new enough build if the default is too old.
 NGSPICE ?= ngspice

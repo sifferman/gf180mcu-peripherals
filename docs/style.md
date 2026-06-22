@@ -64,6 +64,11 @@ it is recorded here so the same mistake isn't repeated.
    ~10 lines of always_ff and an assign. No module needed.
 3. **Add a new module** — LAST RESORT. Check `third_party/` again first.
 
+- **No SystemVerilog `package`s.** The design is kept package-free. Share a
+  small pure function by defining it in each module that needs it (a few
+  duplicated lines beats a package + import + file-ordering dependency); keep
+  constants as module `localparam`s. Reusable *logic* still becomes a module.
+
 ## Instantiation
 
 - **One parameter/port connection per line.** Every `.name(value)` port
@@ -82,6 +87,10 @@ it is recorded here so the same mistake isn't repeated.
 - **Don't add comments that restate what the code does**. Comments are
   for *why* and for surprising invariants. If you need a comment to
   explain *what*, the names are bad — fix the names.
+- **Keep comments terse — a phrase, not a paragraph.** State the one fact that
+  drives the decision (e.g. `// small alpha so a coarse DCO's cold-start error
+  can't rail the loop`). If it needs a paragraph, the design or naming is the
+  problem. (Module headers follow the concise format under *File headers*.)
 - Don't put combinational logic in always_ff blocks. Combinational logic
   should only exist in always_comb and assign blocks were _o/_d values are assigned.
   In always_ff blocks, the only logic should be the reset and _q<=_d.

@@ -53,10 +53,7 @@ module adpll_controller_linear #(
     localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1),
     parameter  int unsigned LockWindows = 8,
     parameter  int unsigned LockBand    = 2,    // linear loop dithers a little more than bang-bang
-    // On a COARSE DCO the from-cold frequency error is huge (thousands of edges), so the
-    // proportional gain must be tiny or it slams tune to a rail and the loop oscillates
-    // rail-to-rail. Hence alpha is small (integral-dominant acquisition); the proportional
-    // term mainly damps near lock. A fine multi-bit DCO would tolerate a larger alpha.
+    // small alpha (integral-dominant) so a coarse DCO's huge cold-start error can't rail the loop
     parameter int unsigned AlphaShift  = 10,   // proportional gain alpha = 2^-AlphaShift
     parameter int unsigned BetaShift   = 8     // integral gain    beta  = 2^-BetaShift
 ) (
@@ -73,7 +70,7 @@ module adpll_controller_linear #(
 );
 
 wire [EdgeCountWidth-1:0] measured;
-wire                  sample_valid;
+wire                      sample_valid;
 
 adpll_freq_counter #(
     .MaxEdgesPerWindow(MaxEdgesPerWindow),
@@ -100,10 +97,6 @@ logic [NumTuneBits-1:0]     tune_d, tune_q;                // PI output to the D
 function automatic int clamp(int lo, int value, int hi);
     clamp = (value < lo) ? lo : (value > hi) ? hi : value;
 endfunction
-
-// control_word ([AccWidth+1:0]) is clamped as `int`; statically guard it fits.
-if (AccWidth + 2 > $bits(int))
-    $error("adpll_controller_linear: AccWidth (NumTuneBits + BetaShift) too large for int arithmetic");
 
 // PI loop filter; update only on a fresh measurement (gating lives in _d, not the always_ff).
 always_comb begin

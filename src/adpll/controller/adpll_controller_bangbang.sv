@@ -29,12 +29,12 @@
 // Ref: Hanumolu et al., IEEE CICC 2007, Sec. IV-A (1-bit/DFF-sign detector);
 // Lee, Kundert & Razavi, IEEE JSSC 39(9), 2004 (bang-bang dynamics).
 // Bang-bang FLL loop filter: each window it steps the DCO tune code by the sign of
-// (measured - mul), driving F_DCO = (mul/div) * F_clk_i. Wraps adpll_freq_counter +
+// (dco_edge_count - mul), driving F_DCO = (mul/div) * F_clk_i. Wraps adpll_freq_counter +
 // adpll_lock_detect.
 //
 // Parameters:
 //   - NumTuneBits       : DCO tune-code width
-//   - MaxEdgesPerWindow : max edges/window (sets mul_i / measured width)
+//   - MaxEdgesPerWindow : max edges/window (sets mul_i / dco_edge_count width)
 //   - MaxWindowSize     : max window length (sets div_i width)
 //   - LockSamples       : consecutive in-band samples to declare lock
 //   - IntegralGain, ProportionalGain : per-window LSB steps (sign-scaled)

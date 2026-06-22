@@ -28,13 +28,13 @@
 //
 // Ref: Kratyuk, Hanumolu, Moon & Mayaram, IEEE TCAS-II 54(3), 2007 (full digital PI
 // loop-filter design procedure; power-of-two alpha/beta).
-// Linear PI FLL loop filter: drives the multi-bit frequency error (measured - mul) to zero
+// Linear PI FLL loop filter: drives the multi-bit frequency error (dco_edge_count - mul) to zero
 // with anti-windup, so F_DCO = (mul/div) * F_clk_i. Same front end / lock detector as the
 // bang-bang sibling; only the filter differs.
 //
 // Parameters:
 //   - NumTuneBits       : DCO tune-code width
-//   - MaxEdgesPerWindow : max edges/window (sets mul_i / measured width)
+//   - MaxEdgesPerWindow : max edges/window (sets mul_i / dco_edge_count width)
 //   - MaxWindowSize     : max window length (sets div_i width)
 //   - LockSamples, BandRadius : lock-detector in-band samples / +/- tolerance
 //   - AlphaShift, BetaShift : proportional / integral gains = 2^-shift

@@ -165,9 +165,9 @@ sim-adpll-csr: ## Integrated ADPLL: program mul/div/enable over AXI4-Lite CSR, p
 	vvp cocotb/sim_build/tb_adpll_csr | grep -E "CSR programmed|LOCKED|PASS|FAIL"
 .PHONY: sim-adpll-csr
 
-sim-adpll-survey: ## Compare the ADPLL controller variants (bang-bang PI vs linear PI): lock time + code
+sim-adpll-survey: ## Compare the ADPLL controller variants (bang-bang / linear / gearshift PI): lock time + code
 	@mkdir -p cocotb/sim_build
-	@for ctrl in "bang-bang:" "linear:-DCTRL_LINEAR"; do \
+	@for ctrl in "bang-bang:" "linear:-DCTRL_LINEAR" "gearshift:-DCTRL_GEARSHIFT"; do \
 		name=$${ctrl%%:*}; def=$${ctrl#*:}; \
 		echo "==== controller: $$name ===="; \
 		iverilog -g2012 $$def -o cocotb/sim_build/tb_adpll_$$name $(ADPLL_TS) $(ADPLL_RTL) cocotb/models/tb_adpll.v && \
@@ -175,10 +175,10 @@ sim-adpll-survey: ## Compare the ADPLL controller variants (bang-bang PI vs line
 	done
 .PHONY: sim-adpll-survey
 
-sim-adpll-matrix: ## Verify ALL 6 ADPLL variants (2 controllers x 3 DCOs): lock time + settled tune
+sim-adpll-matrix: ## Verify ALL 9 ADPLL variants (3 controllers x 3 DCOs): lock time + settled tune
 	@mkdir -p cocotb/sim_build
 	@printf "%-26s %-12s %-8s %s\n" "config (ctrl x dco)" "lock_cyc" "tune" "result"
-	@for ctrl in "bb:" "lin:-DCTRL_LINEAR"; do \
+	@for ctrl in "bb:" "lin:-DCTRL_LINEAR" "gear:-DCTRL_GEARSHIFT"; do \
 		for dco in "binary:" "therm:-DDCO_THERM" "muxtap:-DDCO_MUXTAP"; do \
 			cn=$${ctrl%%:*}; cd=$${ctrl#*:}; dn=$${dco%%:*}; dd=$${dco#*:}; \
 			iverilog -g2012 $$cd $$dd -o cocotb/sim_build/tb_mx_$${cn}_$${dn} $(ADPLL_TS) $(ADPLL_RTL) cocotb/models/tb_adpll.v 2>/dev/null && \

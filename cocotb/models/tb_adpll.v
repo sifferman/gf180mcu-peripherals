@@ -5,6 +5,7 @@
 // controller and DCO variant with plusdefines (testbench-only, not RTL):
 //   default              : adpll_controller_bangbang (bang-bang PI) + ring_dco_binary (binary)
 //   -DCTRL_LINEAR         : adpll_controller_linear (linear PI)
+//   -DCTRL_GEARSHIFT      : adpll_controller_gearshift (adaptive-step bang-bang)
 //   -DDCO_THERM / -DDCO_MUXTAP : the thermometer / mux-tap DCO
 //
 // The controller drives F_DCO = (mul/div)*F_ref. With the behavioural DCO (half-period
@@ -43,6 +44,8 @@ module tb_adpll;
 
 `ifdef CTRL_LINEAR
   adpll_controller_linear #(.NumTuneBits(NUM_TUNE)) u_ctrl (
+`elsif CTRL_GEARSHIFT
+  adpll_controller_gearshift #(.NumTuneBits(NUM_TUNE)) u_ctrl (
 `else
   adpll_controller_bangbang #(.NumTuneBits(NUM_TUNE)) u_ctrl (
 `endif

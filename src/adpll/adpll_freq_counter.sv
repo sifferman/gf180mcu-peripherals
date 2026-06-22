@@ -90,24 +90,20 @@ always_ff @(posedge dco_clk_i or negedge rst_ni) begin
     end
 end
 
-// Reference domain: two-flop Gray synchronizer.
-logic [EdgeCountWidth-1:0] gray_sync0_d, gray_sync0_q;
-logic [EdgeCountWidth-1:0] gray_sync1_d, gray_sync1_q;
-always_comb begin
-    gray_sync0_d = dco_edge_count_gray_q;
-    gray_sync1_d = gray_sync0_q;
-end
+// Reference domain: two-flop Gray synchronizer (gray_sync_q may be metastable; gray_sync_q2 is settled).
+logic [EdgeCountWidth-1:0] gray_sync_d, gray_sync_q, gray_sync_q2;
+always_comb gray_sync_d = dco_edge_count_gray_q;
 always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-        gray_sync0_q <= '0;
-        gray_sync1_q <= '0;
+        gray_sync_q  <= '0;
+        gray_sync_q2 <= '0;
     end else begin
-        gray_sync0_q <= gray_sync0_d;
-        gray_sync1_q <= gray_sync1_d;
+        gray_sync_q  <= gray_sync_d;
+        gray_sync_q2 <= gray_sync_q;   // shift stage: input is the prior stage's output
     end
 end
 logic [EdgeCountWidth-1:0] dco_edge_count_sync;
-always_comb dco_edge_count_sync = gray2bin(gray_sync1_q);
+always_comb dco_edge_count_sync = gray2bin(gray_sync_q2);
 
 // Programmable measurement window: a clk_i counter that rolls over every window_length_i cycles.
 logic [WindowSizeWidth-1:0] window_count_d,          window_count_q;

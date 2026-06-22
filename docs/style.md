@@ -31,6 +31,10 @@ it is recorded here so the same mistake isn't repeated.
   `_d` (`_d = en ? next : _q`), never `if (en) _q <= …` in the `always_ff`.
   (The one pragmatic exception is a RAM write port — a memory array has no
   `_d` shadow, so `if (we) mem[addr] <= wdata` stays in the `always_ff`.)
+  A **shift-register / synchronizer stage** is also exempt from needing its own
+  `_d`: a later stage may take the prior stage's `_q` directly (`_q2 <= _q`),
+  since its next-state *is* that `_q` and a separate `_d` net would just alias it.
+  Only the first (capture) stage keeps a `_d` (`_q <= _d`).
 - **No abbreviations.** Spell the word out: `controller` not `ctrl`,
   `integral` not `integ`, `accumulator` not `acc`, `frequency` not `freq`
   (in prose). The only allowed short forms are universally understood ones:

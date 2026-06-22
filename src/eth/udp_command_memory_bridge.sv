@@ -189,7 +189,7 @@ wire is_rd = (opcode_q == DmaOpRead);
 wire [15:0] reply_paylen = 16'(DmaHeaderBytes) + (is_rd ? cmd_len_q : 16'd0);
 
 // Reply header byte at TX position t (0..9).
-function automatic logic [7:0] reply_byte(input logic [3:0] t);
+function automatic logic [7:0] reply_byte(logic [3:0] t);
     case (t)
         4'd0: reply_byte = DmaMagic;
         4'd1: reply_byte = opcode_q | DmaRespFlag;

@@ -47,14 +47,15 @@ module adpll_freq_counter #(
     parameter  int unsigned MaxWindowSize     = (1 << 16) - 1,
     localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1)
 ) (
-    input  wire                         clk_i,
-    input  wire                         rst_ni,
-    input  wire                         enable_i,
-    input  wire [WindowSizeWidth-1:0]  div_i,        // measurement window length, in clk_i cycles
-    input  wire                         dco_clk_i,
+    input  wire                       clk_i,
+    input  wire                       rst_ni,
 
-    output wire [EdgeCountWidth-1:0]    measured_o,   // DCO edges in the last completed window
-    output wire                         sample_valid_o
+    input  wire                       enable_i,
+    input  wire [WindowSizeWidth-1:0] div_i,        // measurement window length, in clk_i cycles
+    input  wire                       dco_clk_i,
+
+    output wire [EdgeCountWidth-1:0]  measured_o,   // DCO edges in the last completed window
+    output wire                       sample_valid_o
 );
 
 function automatic logic [EdgeCountWidth-1:0] bin2gray(logic [EdgeCountWidth-1:0] b);
@@ -101,10 +102,10 @@ logic [EdgeCountWidth-1:0] dco_cnt_sync;
 always_comb dco_cnt_sync = gray2bin(gray_sync1_q);
 
 // Programmable measurement window: a clk_i counter that rolls over every div_i cycles.
-logic [WindowSizeWidth-1:0]   window_cnt_d,    window_cnt_q;
-logic [EdgeCountWidth-1:0] cnt_at_window_d, cnt_at_window_q;  // edge-count snapshot at window edge
-logic [EdgeCountWidth-1:0] measured_d,      measured_q;
-logic                  sample_valid_d,  sample_valid_q;
+logic [WindowSizeWidth-1:0] window_cnt_d,    window_cnt_q;
+logic [EdgeCountWidth-1:0]  cnt_at_window_d, cnt_at_window_q; // edge-count snapshot at window edge
+logic [EdgeCountWidth-1:0]  measured_d,      measured_q;
+logic                       sample_valid_d,  sample_valid_q;
 
 wire window_tick = (window_cnt_q >= div_i - 1'b1);
 
@@ -142,4 +143,3 @@ assign measured_o     = measured_q;
 assign sample_valid_o = sample_valid_q;
 
 endmodule
-

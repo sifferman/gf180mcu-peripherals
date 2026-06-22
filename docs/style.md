@@ -109,6 +109,11 @@ it is recorded here so the same mistake isn't repeated.
   not a one-argument form that reaches module-scope bounds.
 - **Use `'0` for an all-zero value**, not `{Width{1'b0}}`. (Likewise `'1`,
   and `'x` for sim-only don't-cares.)
+- **Compare a magnitude against an unsigned tolerance, not a signed ± bound.**
+  For a "within ±tol" test, compute an explicit unsigned absolute value and compare
+  it to the unsigned bound (`band_error_abs <= BandRadius`), rather than building a
+  signed bound and checking `(e >= -Bound) && (e <= Bound)`. A "signed radius" is a
+  contradiction — a radius is a magnitude.
 
 ## Time and compiler directives
 

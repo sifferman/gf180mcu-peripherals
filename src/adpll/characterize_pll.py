@@ -23,19 +23,19 @@ def clamp(v, lo, hi):
 
 
 class LockDetect:
-    """Mirrors adpll_lock_detect.sv: declares lock after LockWindows in-band samples."""
-    def __init__(self, band, lock_windows):
-        self.band, self.lw = band, lock_windows
-        self.centre, self.in_band, self.lock = 0, 0, False
+    """Mirrors adpll_lock_detect.sv: declares lock after LockSamples in-band samples."""
+    def __init__(self, band_radius, lock_samples):
+        self.band_radius, self.lock_samples = band_radius, lock_samples
+        self.band_center, self.in_band_count, self.lock = 0, 0, False
 
-    def sample(self, code):
-        if abs(code - self.centre) <= self.band:
-            if self.in_band == self.lw:
+    def sample(self, tuning_sample):
+        if abs(tuning_sample - self.band_center) <= self.band_radius:
+            if self.in_band_count == self.lock_samples:
                 self.lock = True
             else:
-                self.in_band += 1
+                self.in_band_count += 1
         else:
-            self.centre, self.in_band, self.lock = code, 0, False
+            self.band_center, self.in_band_count, self.lock = tuning_sample, 0, False
         return self.lock
 
 
@@ -51,7 +51,7 @@ def run_loop(freq_of_code, bits, ctrl, mul, div, ref_ns, max_windows=4000, post_
 
     integ = acc = 0
     tune = tune_active = 0
-    lock = LockDetect(band=(1 if ctrl == "bangbang" else LOCKBAND), lock_windows=8)
+    lock = LockDetect(band_radius=(1 if ctrl == "bangbang" else LOCKBAND), lock_samples=8)
     traj = []
     lock_window = None
 

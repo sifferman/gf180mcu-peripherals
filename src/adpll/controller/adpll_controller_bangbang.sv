@@ -36,7 +36,7 @@
 //   - NumTuneBits       : DCO tune-code width
 //   - MaxEdgesPerWindow : max edges/window (sets mul_i / measured width)
 //   - MaxWindowSize     : max window length (sets div_i width)
-//   - LockWindows       : in-band samples to declare lock
+//   - LockSamples       : consecutive in-band samples to declare lock
 //   - IntegralGain, ProportionalGain : per-window LSB steps (sign-scaled)
 // Ports:
 //   - clk_i, rst_ni, enable_i
@@ -52,7 +52,7 @@ module adpll_controller_bangbang #(
     localparam int unsigned EdgeCountWidth    = $clog2(MaxEdgesPerWindow + 1),
     parameter  int unsigned MaxWindowSize     = (1 << 16) - 1,
     localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1),
-    parameter  int unsigned LockWindows      = 8,
+    parameter  int unsigned LockSamples      = 8,
     parameter  int unsigned IntegralGain     = 1,
     parameter  int unsigned ProportionalGain = 1
 ) (
@@ -69,7 +69,7 @@ module adpll_controller_bangbang #(
 );
 
 wire [EdgeCountWidth-1:0] measured;
-wire                  sample_valid;
+wire                      sample_valid;
 
 adpll_freq_counter #(
     .MaxEdgesPerWindow(MaxEdgesPerWindow),
@@ -126,16 +126,16 @@ end
 
 // Lock on the integral operating point (the clean code, not the +-1 LSB limit cycle).
 adpll_lock_detect #(
-    .SampleWidth      (NumTuneBits),
-    .LockSamples(LockWindows),
-    .BandRadius       (1)
+    .SampleWidth(NumTuneBits),
+    .LockSamples(LockSamples),
+    .BandRadius (1)
 ) adpll_lock_detect (
     .clk_i,
     .rst_ni,
     .enable_i,
-    .sample_valid_i(sample_valid),
-    .tuning_sample_i      (integral_q),
-    .lock_o        (lock_o)
+    .sample_valid_i (sample_valid),
+    .tuning_sample_i(integral_q),
+    .lock_o         (lock_o)
 );
 
 assign tune_o = tune_q;

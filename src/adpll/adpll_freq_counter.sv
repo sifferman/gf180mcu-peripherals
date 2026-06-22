@@ -70,12 +70,9 @@ function automatic logic [EdgeCountWidth-1:0] gray2bin(logic [EdgeCountWidth-1:0
         gray2bin = gray2bin ^ (g >> i);
 endfunction
 
-// DCO domain: a free-running counter of DCO rising edges. It is never cleared between windows
-// and is allowed to wrap (mod 2^EdgeCountWidth) -- the measurement below is the *difference*
-// of two snapshots, and unsigned subtraction makes a single wrap cancel out, so no rollover
-// value is needed as long as one window holds <= MaxEdgesPerWindow edges (what EdgeCountWidth is
-// sized for). A Gray-coded copy is kept so only one bit changes per edge, which is what lets the
-// value cross safely into clk_i through the two-flop synchronizer below.
+// DCO domain: free-running edge counter. Wrap is harmless -- the measurement is a difference of
+// snapshots, so an unsigned subtraction cancels one wrap (valid while a window <= MaxEdgesPerWindow).
+// A Gray copy crosses into clk_i: one bit changes per edge, safe through the synchronizer below.
 logic [EdgeCountWidth-1:0] dco_edge_count_binary_d, dco_edge_count_binary_q;
 logic [EdgeCountWidth-1:0] dco_edge_count_gray_d,   dco_edge_count_gray_q;
 always_comb dco_edge_count_binary_d = dco_edge_count_binary_q + 1'b1;
@@ -104,24 +101,24 @@ end
 logic [EdgeCountWidth-1:0] dco_edge_count_sync;
 always_comb dco_edge_count_sync = gray2bin(gray_sync_q2);
 
-// Programmable measurement window: a clk_i counter that rolls over every window_length_i cycles.
-logic [WindowSizeWidth-1:0] window_count_d,          window_count_q;
+// Programmable measurement window: a clk_i cycle counter that rolls over every window_length_i cycles.
+logic [WindowSizeWidth-1:0] window_cycle_count_d,    window_cycle_count_q;
 logic [EdgeCountWidth-1:0]  count_at_window_start_d, count_at_window_start_q; // snapshot at last boundary
 logic [EdgeCountWidth-1:0]  dco_edge_count_d,        dco_edge_count_q;
 logic                       sample_valid_d,          sample_valid_q;
 
-wire window_tick = (window_count_q >= window_length_i - 1'b1);
+wire window_tick = (window_cycle_count_q >= window_length_i - 1'b1);
 
 always_comb begin
-    window_count_d          = window_count_q + 1'b1;
+    window_cycle_count_d    = window_cycle_count_q + 1'b1;
     count_at_window_start_d = count_at_window_start_q;
     dco_edge_count_d        = dco_edge_count_q;
     sample_valid_d          = 1'b0;
     if (!enable_i) begin
-        window_count_d          = '0;
+        window_cycle_count_d    = '0;
         count_at_window_start_d = dco_edge_count_sync;
     end else if (window_tick) begin
-        window_count_d          = '0;
+        window_cycle_count_d    = '0;
         count_at_window_start_d = dco_edge_count_sync;
         dco_edge_count_d        = dco_edge_count_sync - count_at_window_start_q;
         sample_valid_d          = 1'b1;
@@ -130,12 +127,12 @@ end
 
 always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-        window_count_q          <= '0;
+        window_cycle_count_q    <= '0;
         count_at_window_start_q <= '0;
         dco_edge_count_q        <= '0;
         sample_valid_q          <= 1'b0;
     end else begin
-        window_count_q          <= window_count_d;
+        window_cycle_count_q    <= window_cycle_count_d;
         count_at_window_start_q <= count_at_window_start_d;
         dco_edge_count_q        <= dco_edge_count_d;
         sample_valid_q          <= sample_valid_d;

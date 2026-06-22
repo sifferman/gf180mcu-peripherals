@@ -116,3 +116,19 @@ unverified. The clean fix is SDC work: declare `dco_clk` as a clock (or set the 
 a false path) + keep the (* keep *)/dont_touch on the ring cells. M2 (Ethernet+SDRAM, no ADPLL)
 hardens clean today; M3 (with ADPLL) harden is attempted next and the outcome will be reported
 rather than assumed.
+
+### dco_clk SDC net name (resolved 2026-06-22)
+
+The M3 harden's dco_clk SDC clause printed "No ADPLL DCO pin found" — my pattern
+(*i_pll_dco*clk_o*, *pll_dco_clk*) didn't match. Root cause: synthesis flattens the
+hierarchy AND merges the DCO clock net with the analog pad, because chip_core does
+`assign analog[0] = pll_dco_clk`. In the netlist the ring's final mux drives `.Y(analog_PAD[0])`
+and the feedback NAND reads `.B(analog_PAD[0])` — i.e. **the DCO oscillation net is
+`analog_PAD[0]`**. The correct SDC target is therefore:
+    create_clock -name dco_clk -period 2.0 [get_nets {analog_PAD[0]}]   ;# + async clock group
+The first M3 run (RUN_2026-06-22_03-14-04) hardened with dco_clk UNCONSTRAINED (the DCO-domain
+freq_meas counter untimed). Not editing the SDC mid-run (signoff STA re-reads it -> would desync
+from PnR). Fix the net name, then re-harden to validate a properly-constrained M3. Open question
+worth confirming: whether CTS cleanly handles a clock rooted on the (dont_touch) ring-oscillator
+net that also drives an analog output pad, or whether the DCO counter clock should instead be
+taken from a buffered tap.

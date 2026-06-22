@@ -28,11 +28,11 @@
 //
 // Ref: Lee, Kundert & Razavi, IEEE JSSC 39(9), 2004 (bang-bang limit-cycle lock).
 // Asserts lock_o once the sampled value stays within +/-BandRadius of the band_center (its
-// held reference) for LockSamples consecutive samples.
+// held reference) for MinSamplesForLock consecutive samples.
 //
 // Parameters:
 //   - SampleWidth : width of the sample
-//   - LockSamples : consecutive in-band samples required to declare lock
+//   - MinSamplesForLock : consecutive in-band samples required to declare lock
 //   - BandRadius  : +/- tolerance around band_center, in LSBs
 // Ports:
 //   - clk_i, rst_ni, enable_i
@@ -42,7 +42,7 @@
 
 module adpll_lock_detect #(
     parameter int unsigned SampleWidth = 7,
-    parameter int unsigned LockSamples = 8,
+    parameter int unsigned MinSamplesForLock = 8,
     parameter int unsigned BandRadius  = 1
 ) (
     input  wire                   clk_i,
@@ -55,7 +55,7 @@ module adpll_lock_detect #(
 );
 
 logic [SampleWidth-1:0]           band_center_d, band_center_q;
-logic [$clog2(LockSamples+1)-1:0] in_band_d, in_band_q;
+logic [$clog2(MinSamplesForLock+1)-1:0] in_band_d, in_band_q;
 logic                             lock_d, lock_q;
 
 wire signed [SampleWidth+1:0] band_error     = $signed({2'b0, tuning_sample_i}) - $signed({2'b0, band_center_q});
@@ -71,7 +71,7 @@ always_comb begin
         lock_d    = 1'b0;
     end else if (sample_valid_i) begin
         if (in_band) begin
-            if (in_band_q == LockSamples[$bits(in_band_q)-1:0])
+            if (in_band_q == MinSamplesForLock[$bits(in_band_q)-1:0])
                 lock_d = 1'b1;
             else
                 in_band_d = in_band_q + 1'b1;

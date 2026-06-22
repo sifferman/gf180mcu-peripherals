@@ -36,7 +36,7 @@
 //   - NumTuneBits       : DCO tune-code width
 //   - MaxEdgesPerWindow : max edges/window (sets mul_i / dco_edge_count width)
 //   - MaxWindowSize     : max window length (sets div_i width)
-//   - LockSamples, BandRadius : lock-detector in-band samples / +/- tolerance
+//   - MinSamplesForLock, BandRadius : lock-detector in-band samples / +/- tolerance
 //   - AlphaShift, BetaShift : proportional / integral gains = 2^-shift
 // Ports:
 //   - clk_i, rst_ni, enable_i
@@ -51,7 +51,7 @@ module adpll_controller_linear #(
     localparam int unsigned EdgeCountWidth    = $clog2(MaxEdgesPerWindow + 1),
     parameter  int unsigned MaxWindowSize     = (1 << 16) - 1,
     localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1),
-    parameter  int unsigned LockSamples = 8,
+    parameter  int unsigned MinSamplesForLock = 8,
     parameter  int unsigned BandRadius  = 2,    // linear loop dithers a little more than bang-bang
     // small alpha (integral-dominant) so a coarse DCO's huge cold-start error can't rail the loop
     parameter int unsigned AlphaShift  = 10,   // proportional gain alpha = 2^-AlphaShift
@@ -129,7 +129,7 @@ end
 // The linear loop settles to a near-static code, so watch the output tune directly.
 adpll_lock_detect #(
     .SampleWidth(NumTuneBits),
-    .LockSamples(LockSamples),
+    .MinSamplesForLock(MinSamplesForLock),
     .BandRadius (BandRadius)
 ) adpll_lock_detect (
     .clk_i,

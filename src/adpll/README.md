@@ -9,7 +9,7 @@ Ethernet in this chip) and `clk_o`/`lock` are meant for the analog observation p
 ## Files
 | file | role |
 |---|---|
-| `ring_dco.sv` | binary-weighted ring oscillator. `NAND2` gate + per-bit weighted inverter-pair delay segments selected by `mux2`. Structural gf180 cells (`nand2_2`/`inv_2`/`mux2_2`) with `(* keep *)`/`(* dont_touch *)` for synth/SPICE; a `FUNCTIONAL` behavioural clock model for digital sim. |
+| `ring_dco.sv` | binary-weighted ring oscillator. `NAND2` gate + per-bit weighted inverter-pair delay segments selected by `mux2`. Structural gf180 cells (`nand2_2`/`inv_2`/`mux2_2`) with `(* keep *)`/`(* dont_touch *)` for synth/SPICE; a behavioural (`ifndef SYNTHESIS`) clock model for digital sim. |
 | `adpll_ctrl.sv` | bang-bang frequency-locked loop. Gray-coded DCO edge counter CDC'd into the reference clock domain; per-window count vs `target_i`; tune ±1 per window; lock asserts when the tune code stays within a ±1 band for `LockWindows` windows. |
 | `gen_ring_dco_spice.py` | emits a SPICE deck for the ring from the PDK cell subckts and sweeps tune codes through ngspice (freq-vs-code). |
 

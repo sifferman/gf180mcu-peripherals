@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Survey testbench for the digital ADPLL (ring DCO + frequency-locked controller). Runs
-// under Icarus with FUNCTIONAL so the DCO compiles its behavioural clock model. Selects the
+// under Icarus (SYNTHESIS undefined) so the DCO compiles its behavioural clock model. Selects the
 // controller and DCO variant with plusdefines (testbench-only, not RTL):
 //   default              : adpll_ctrl (bang-bang PI) + ring_dco (binary)
 //   -DCTRL_LINEAR         : adpll_ctrl_linear (linear PI)

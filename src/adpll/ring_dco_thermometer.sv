@@ -44,7 +44,7 @@
 // Same enable_i/tune_i/clk_o interface as ring_dco, so the two are drop-in swappable in
 // adpll_ctrl. See adpll_ctrl.sv for the full reference list and src/adpll/README.md.
 
-`timescale 1ns/1ps   // needed by the FUNCTIONAL behavioural model's #-delays
+`timescale 1ns/1ps   // needed by the behavioural (ifndef SYNTHESIS) model's #-delays
 `default_nettype none
 
 (* keep_hierarchy *)
@@ -58,7 +58,7 @@ module ring_dco_thermometer #(
 
 localparam int unsigned NumUnits = (1 << NumTuneBits) - 1;
 
-`ifndef FUNCTIONAL
+`ifdef SYNTHESIS
 
 // Thermometer decode: unit_enable[k] = 1 iff k < tune_i.
 wire [NumUnits-1:0] unit_enable;

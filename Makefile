@@ -152,7 +152,7 @@ sim-bridge: clone-pdk defines ## Bridge a UDP socket to the sim so dma.py drives
 ADPLL_RTL = $(wildcard src/adpll/*.sv)
 sim-adpll: ## Standalone digital ADPLL test: ring DCO (behavioural) + FLL lock (iverilog, no PDK)
 	mkdir -p cocotb/sim_build
-	iverilog -g2012 -DFUNCTIONAL -o cocotb/sim_build/tb_adpll $(ADPLL_RTL) cocotb/models/tb_adpll.v
+	iverilog -g2012 -o cocotb/sim_build/tb_adpll $(ADPLL_RTL) cocotb/models/tb_adpll.v
 	vvp cocotb/sim_build/tb_adpll
 .PHONY: sim-adpll
 
@@ -161,7 +161,7 @@ sim-adpll-survey: ## Compare the ADPLL controller variants (bang-bang PI vs line
 	@for ctrl in "bang-bang:" "linear:-DCTRL_LINEAR"; do \
 		name=$${ctrl%%:*}; def=$${ctrl#*:}; \
 		echo "==== controller: $$name ===="; \
-		iverilog -g2012 -DFUNCTIONAL $$def -o cocotb/sim_build/tb_adpll_$$name $(ADPLL_RTL) cocotb/models/tb_adpll.v && \
+		iverilog -g2012 $$def -o cocotb/sim_build/tb_adpll_$$name $(ADPLL_RTL) cocotb/models/tb_adpll.v && \
 		vvp cocotb/sim_build/tb_adpll_$$name | grep -E "LOCKED|PASS|FAIL"; \
 	done
 .PHONY: sim-adpll-survey

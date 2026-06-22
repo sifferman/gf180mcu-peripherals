@@ -59,11 +59,11 @@
 // library by name with keep/dont_touch (synthesis/PnR must not dissolve the loop), its
 // real frequency-vs-code curve only exists after extraction (characterize in SPICE, see
 // `make dco-spice`), and event-driven sim cannot evaluate a zero-delay loop so a
-// behavioural clock-generator is compiled under FUNCTIONAL instead. Standalone observe-
+// behavioural clock-generator is compiled (ifndef SYNTHESIS) instead. Standalone observe-
 // only block: it does not clock the core; enable_i/tune_i come from a CSR and clk_o/lock
 // reach the analog pads via adpll_ctrl.
 
-`timescale 1ns/1ps   // needed by the FUNCTIONAL behavioural model's #-delays
+`timescale 1ns/1ps   // needed by the behavioural (ifndef SYNTHESIS) model's #-delays
 `default_nettype none
 
 (* keep_hierarchy *)
@@ -75,7 +75,7 @@ module ring_dco #(
     output wire                   clk_o
 );
 
-`ifndef FUNCTIONAL
+`ifdef SYNTHESIS
 
 // Structural implementation (synthesis / SPICE extraction):
 //   node[0]          = NAND2(enable_i, feedback)
@@ -115,7 +115,7 @@ assign clk_o    = node[NumTuneBits];
 
 `else
 
-// Behavioural model (event-driven simulation only). A real ring oscillator has no period
+// Behavioural model (event-driven simulation only; SYNTHESIS undefined). A real ring oscillator has no period
 // in zero-delay RTL, so clk_o is a free-running clock whose half-period grows with tune_i.
 // The numbers are illustrative; SPICE gives the true curve. half_ps >= BaseHalfPs > 0
 // always, so there is never a zero-delay loop. Half-period is kept in integer ps (a

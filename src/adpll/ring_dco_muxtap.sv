@@ -39,7 +39,7 @@
 // selected number of inverter pairs. Same enable_i/tune_i/clk_o interface as the other DCOs
 // (drop-in swappable in adpll_ctrl). See adpll_ctrl.sv for the reference list.
 
-`timescale 1ns/1ps   // needed by the FUNCTIONAL behavioural model's #-delays
+`timescale 1ns/1ps   // needed by the behavioural (ifndef SYNTHESIS) model's #-delays
 `default_nettype none
 
 (* keep_hierarchy *)
@@ -53,7 +53,7 @@ module ring_dco_muxtap #(
 
 localparam int unsigned NumTaps = (1 << NumTuneBits);
 
-`ifndef FUNCTIONAL
+`ifdef SYNTHESIS
 
 wire feedback;
 wire node0;

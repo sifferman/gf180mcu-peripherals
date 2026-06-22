@@ -39,18 +39,19 @@ def pdk_paths(pdk_root, pdk="gf180mcuD"):
     return design, models, cells
 
 
-def gen_deck(design, models, cells, bits, code, vdd=3.3, corner="typical",
+def gen_deck(design, models, cells, bits, code, vdd=3.3, corner="typical", temp=25.0,
              tstop_ns=1600.0, tstep_ps=10.0, settle_rise=6, meas_periods=10):
-    """Return a SPICE deck string for one tune code."""
+    """Return a SPICE deck string for one tune code at one PVT corner."""
     # ngspice is picky: .lib/.include paths must be UNQUOTED, and .measure right-hand
     # sides must be literal numbers (a {VDD/2} param expression fails to evaluate).
     vth = vdd / 2.0
     L = []
     a = L.append
-    a(f"* ring_dco binary-weighted DCO  bits={bits} code={code} corner={corner}")
+    a(f"* ring_dco binary-weighted DCO  bits={bits} code={code} corner={corner} vdd={vdd} temp={temp}")
     a(f".include {design}")               # statistical params referenced by the models
-    a(f".lib {models} {corner}")
+    a(f".lib {models} {corner}")          # process corner (transistor model skew)
     a(f".include {cells}")
+    a(f".temp {temp}")                    # temperature corner
     a("")
     a(f".param VDD={vdd}")
     a("Vdd  VDD 0 {VDD}")
@@ -123,7 +124,9 @@ def main():
     ap.add_argument("--pdk", default="gf180mcuD")
     ap.add_argument("--bits", type=int, default=7)
     ap.add_argument("--code", type=int, default=0)
-    ap.add_argument("--corner", default="typical")
+    ap.add_argument("--corner", default="typical", help="process corner: typical|ss|ff|fs|sf")
+    ap.add_argument("--vdd", type=float, default=3.3, help="supply voltage corner")
+    ap.add_argument("--temp", type=float, default=25.0, help="temperature corner (C)")
     ap.add_argument("--tstop-ns", type=float, default=3000.0)
     ap.add_argument("--sweep", default="", help="comma-separated codes to sweep")
     ap.add_argument("--run", action="store_true", help="run ngspice and report freq")
@@ -138,7 +141,7 @@ def main():
 
     if args.sweep:
         codes = [int(c) for c in args.sweep.split(",")]
-        print(f"# ring_dco freq-vs-code sweep  bits={args.bits} corner={args.corner}", flush=True)
+        print(f"# ring_dco freq-vs-code sweep  bits={args.bits} corner={args.corner} vdd={args.vdd} temp={args.temp}", flush=True)
         print(f"# {'code':>5}  {'freq_MHz':>12}  {'period_ns':>12}", flush=True)
         for code in codes:
             # Escalate tstop so fast (low) codes stay cheap and only slow (high) codes
@@ -146,7 +149,7 @@ def main():
             freq = period = None
             for tstop in (150.0, 500.0, 1600.0, 5000.0):
                 deck = gen_deck(design, models, cells, args.bits, code,
-                                corner=args.corner, tstop_ns=tstop)
+                                corner=args.corner, vdd=args.vdd, temp=args.temp, tstop_ns=tstop)
                 freq, period, txt, path = run_ngspice(deck, args.workdir, f"b{args.bits}_c{code}",
                                                       ngspice=args.ngspice, meas_periods=10)
                 if freq:
@@ -159,7 +162,7 @@ def main():
         return
 
     deck = gen_deck(design, models, cells, args.bits, args.code,
-                    corner=args.corner, tstop_ns=args.tstop_ns)
+                    corner=args.corner, vdd=args.vdd, temp=args.temp, tstop_ns=args.tstop_ns)
     if args.run:
         freq, period, txt, path = run_ngspice(deck, args.workdir, f"b{args.bits}_c{args.code}", ngspice=args.ngspice, meas_periods=10)
         print(txt)

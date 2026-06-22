@@ -31,3 +31,11 @@ monotonic region, or constrain stage count / add single-edge startup for product
 - Preserve the ring in PnR: `SYNTH_KEEP_HIERARCHY`/keep modules for `ring_dco`,
   `RSZ_DONT_TOUCH` the oscillator nets, and extract the ring's frequency in SPICE rather than
   trusting STA on the combinational loop.
+
+## Variants & survey
+
+This is a survey subsystem: multiple DCO and controller variants (each its own module,
+shared front end in `adpll_freq_meas`/`adpll_lock_detect`), grounded in `reference/adpll/`
+with per-decision citations. See **`docs/adpll_survey.md`** for the variant matrix, the
+citations/quotes, the controller lock comparison (`make sim-adpll-survey`), and the
+PVT-corner DCO data (`make dco-spice-corners`).

@@ -149,12 +149,22 @@ sim-bridge: clone-pdk defines ## Bridge a UDP socket to the sim so dma.py drives
 	cd cocotb; TEST_MODULE=sim_udp_bridge PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} PAD=${PAD} SCL=${SCL} SRAM=${SRAM} python3 chip_top_tb.py
 .PHONY: sim-bridge
 
-sim-adpll: ## Standalone digital PLL test: ring DCO (behavioural) + FLL lock (iverilog, no PDK)
+ADPLL_RTL = $(wildcard src/adpll/*.sv)
+sim-adpll: ## Standalone digital ADPLL test: ring DCO (behavioural) + FLL lock (iverilog, no PDK)
 	mkdir -p cocotb/sim_build
-	iverilog -g2012 -DFUNCTIONAL -o cocotb/sim_build/tb_adpll \
-		src/adpll/ring_dco.sv src/adpll/adpll_ctrl.sv cocotb/models/tb_adpll.v
+	iverilog -g2012 -DFUNCTIONAL -o cocotb/sim_build/tb_adpll $(ADPLL_RTL) cocotb/models/tb_adpll.v
 	vvp cocotb/sim_build/tb_adpll
 .PHONY: sim-adpll
+
+sim-adpll-survey: ## Compare the ADPLL controller variants (bang-bang PI vs linear PI): lock time + code
+	@mkdir -p cocotb/sim_build
+	@for ctrl in "bang-bang:" "linear:-DCTRL_LINEAR"; do \
+		name=$${ctrl%%:*}; def=$${ctrl#*:}; \
+		echo "==== controller: $$name ===="; \
+		iverilog -g2012 -DFUNCTIONAL $$def -o cocotb/sim_build/tb_adpll_$$name $(ADPLL_RTL) cocotb/models/tb_adpll.v && \
+		vvp cocotb/sim_build/tb_adpll_$$name | grep -E "LOCKED|PASS|FAIL"; \
+	done
+.PHONY: sim-adpll-survey
 
 # ngspice >= 42 is required for the gf180 BSIM4 models (mulu0 et al); override NGSPICE
 # to point at a new enough build if the default is too old.
@@ -163,3 +173,16 @@ dco-spice: clone-pdk ## Export ring_dco to SPICE and sweep tune codes through ng
 	python3 src/adpll/gen_ring_dco_spice.py --pdk-root $(PDK_ROOT) --pdk $(PDK) --ngspice $(NGSPICE) \
 		--bits 7 --sweep 0,4,8,16,32,64,96,127 --run --workdir cocotb/sim_build
 .PHONY: dco-spice
+
+# DCO_VARIANT selects the module gen_ring_dco_spice builds (ring_dco / ring_dco_thermometer /
+# ring_dco_muxtap). DCO_BITS trims the ring for faster corner runs.
+DCO_BITS ?= 7
+dco-spice-corners: clone-pdk ## DCO freq-vs-code across SS/TT/FF PVT corners (ngspice) -- run regularly
+	@for corner in "ss 3.0 125" "typical 3.3 25" "ff 3.6 -40"; do \
+		set -- $$corner; \
+		echo "==== corner $$1 / $$2 V / $$3 C ===="; \
+		python3 src/adpll/gen_ring_dco_spice.py --pdk-root $(PDK_ROOT) --pdk $(PDK) --ngspice $(NGSPICE) \
+			--bits $(DCO_BITS) --corner $$1 --vdd $$2 --temp $$3 \
+			--sweep 0,16,32,64,96,127 --run --workdir cocotb/sim_build; \
+	done
+.PHONY: dco-spice-corners

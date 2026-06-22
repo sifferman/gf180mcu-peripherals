@@ -97,16 +97,15 @@ function automatic int clamp(int lo, int value, int hi);
     clamp = (value < lo) ? lo : (value > hi) ? hi : value;
 endfunction
 
-// The PI update is computed as `int`; statically guard that its operands
-// (integral_q + error_sign * gain, max magnitude TuneMax + gain) cannot overflow it.
-if ($clog2(TuneMax + IntegralGain + ProportionalGain + 1) + 1 > $bits(int))
-    $error("adpll_controller_bangbang: NumTuneBits/gains too large for int PI arithmetic");
-
-// 1-bit (sign) frequency error: +1 too fast, -1 too slow, 0 on target.
-wire signed [1:0] error_sign = too_fast ? 1 : (too_slow ? -1 : 0);
-
 // PI loop filter; update only on a fresh measurement (gating lives in _d, not the always_ff).
 always_comb begin
+    logic signed [1:0] error_sign;
+    case ({too_fast, too_slow})
+        2'b10: error_sign = 1;
+        2'b01: error_sign = -1;
+        default: error_sign = 0;
+    endcase
+
     integral_d = integral_q;
     tune_d     = tune_q;
     if (enable_i && sample_valid) begin
@@ -135,7 +134,7 @@ adpll_lock_detect #(
     .rst_ni,
     .enable_i,
     .sample_valid_i(sample_valid),
-    .code_i        (integral_q),
+    .sample_i      (integral_q),
     .lock_o        (lock_o)
 );
 

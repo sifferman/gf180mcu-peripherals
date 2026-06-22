@@ -136,7 +136,7 @@ adpll_lock_detect #(
     .rst_ni,
     .enable_i,
     .sample_valid_i(sample_valid),
-    .code_i        (tune_q),
+    .sample_i      (tune_q),
     .lock_o        (lock_o)
 );
 

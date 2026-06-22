@@ -130,6 +130,9 @@ def main():
     ap.add_argument("--mul", type=int, default=1707)
     ap.add_argument("--div", type=int, default=256)
     ap.add_argument("--ref-ns", type=float, default=40.0)     # 25 MHz reference
+    ap.add_argument("--target-code", type=int, default=24,
+                    help="per-DCO target: aim each loop at its own freq(target-code) so all "
+                         "lock despite the disjoint frequency ranges (mul set per DCO)")
     ap.add_argument("--curve", action="append", default=[], help="NAME:path.dat (repeatable)")
     ap.add_argument("--validate", action="store_true", help="check vs the analytic RTL curve")
     ap.add_argument("--out-dir", default=".")
@@ -149,57 +152,84 @@ def main():
         name, path = spec.split(":", 1)
         curves[name] = load_curve(path, args.bits)
 
+    # The 3 DCOs have disjoint frequency ranges, so give each its own reachable target:
+    # mul set so the target == that DCO's freq at target-code (a mid-range monotonic point).
+    window_s = args.div * args.ref_ns * 1e-9
+    mul_of = {dco: max(1, round(curves[dco](args.target_code) * window_s)) for dco in curves}
+
     rows = []
-    print(f"# 6-variant characterization  bits={args.bits} mul={args.mul} div={args.div} ref={args.ref_ns}ns")
-    print(f"# {'variant':22s} {'settle_cyc':>10} {'settle_us':>10} {'tune':>5} {'freq_MHz':>9} {'jitter':>7} {'lock':>5}")
+    print(f"# 6-variant characterization  bits={args.bits} div={args.div} ref={args.ref_ns}ns "
+          f"target-code={args.target_code} (per-DCO mul; ranges are disjoint)")
+    print(f"# {'variant':22s} {'tgt_MHz':>8} {'mul':>5} {'settle_cyc':>10} {'settle_us':>10} {'tune':>5} {'freq_MHz':>9} {'jitter':>7} {'lock':>5}")
     for dco in curves:
+        tgt = curves[dco](args.target_code) / 1e6
         for ctrl in ("bangbang", "linear"):
-            r = run_loop(curves[dco], args.bits, ctrl, args.mul, args.div, args.ref_ns)
+            r = run_loop(curves[dco], args.bits, ctrl, mul_of[dco], args.div, args.ref_ns)
             rows.append((f"{ctrl}x{dco}", ctrl, dco, r))
-            print(f"  {ctrl+' x '+dco:22s} {r['settle_cyc']:>10} {r['settle_us']:>10.2f} "
+            print(f"  {ctrl+' x '+dco:22s} {tgt:>8.1f} {mul_of[dco]:>5} {r['settle_cyc']:>10} {r['settle_us']:>10.2f} "
                   f"{r['tune']:>5} {r['freq_mhz']:>9.1f} {r['jitter_lsb']:>7} {str(r['locked']):>5}")
 
     if args.plot:
-        plot(rows, curves, args.out_dir)
+        plot(rows, curves, args.out_dir, args.target_code)
 
 
-def plot(rows, curves, out_dir):
+def plot(rows, curves, out_dir, target_code=24):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     os.makedirs(out_dir, exist_ok=True)
     CTRLC = {"bangbang": "#7570b3", "linear": "#d95f02"}
+    DCOLS = {"binary": "-", "thermometer": "--", "muxtap": ":"}
+    DCOC = {"binary": "#1b9e77", "thermometer": "#e7298a", "muxtap": "#666600"}
     dcos = list(curves.keys())
+    short = lambda lbl: lbl.replace("bangbang", "bb").replace("linear", "lin").replace("x", "×")
 
-    fig, ax = plt.subplots(2, 2, figsize=(11, 8))
+    fig, ax = plt.subplots(2, 2, figsize=(12, 8.5))
 
     # (0,0) DCO freq-vs-code curves (the SPICE differentiator)
+    codes = list(range(0, 64))
     for dco in dcos:
-        codes = list(range(0, 64))
-        ax[0, 0].plot(codes, [curves[dco](c) / 1e6 for c in codes], "-", label=dco)
-    ax[0, 0].set_title("SPICE DCO frequency vs. code (TT)")
-    ax[0, 0].set_xlabel("tune code"); ax[0, 0].set_ylabel("MHz"); ax[0, 0].legend(); ax[0, 0].grid(alpha=.3)
+        ax[0, 0].plot(codes, [curves[dco](c) / 1e6 for c in codes], DCOLS[dco],
+                      color=DCOC[dco], lw=1.8, label=dco)
+    ax[0, 0].axvline(target_code, color="0.5", lw=1, ls="-.")
+    ax[0, 0].annotate("target code", (target_code, ax[0, 0].get_ylim()[1]*0.9), fontsize=8,
+                      rotation=90, va="top", ha="right", color="0.4")
+    ax[0, 0].annotate("binary folds →\n(multi-mode)", (33, 403), fontsize=7.5, color=DCOC["binary"])
+    ax[0, 0].set_title("SPICE DCO frequency vs. tune code (TT, 6-bit)")
+    ax[0, 0].set_xlabel("tune code"); ax[0, 0].set_ylabel("DCO frequency (MHz)")
+    ax[0, 0].legend(); ax[0, 0].grid(alpha=.3)
+
+    labels = [short(r[0]) for r in rows]
+    xs = list(range(len(rows)))
+    cols = [CTRLC[r[1]] for r in rows]
 
     # (0,1) settle time bars
-    labels = [r[0] for r in rows]
-    xs = range(len(rows))
-    ax[0, 1].bar(xs, [r[3]["settle_cyc"] for r in rows], color=[CTRLC[r[1]] for r in rows])
-    ax[0, 1].set_xticks(list(xs)); ax[0, 1].set_xticklabels(labels, rotation=40, ha="right", fontsize=8)
+    bars = ax[0, 1].bar(xs, [r[3]["settle_cyc"] for r in rows], color=cols)
+    for b, r in zip(bars, rows):
+        ax[0, 1].annotate(f"{r[3]['settle_us']:.0f}µs", (b.get_x()+b.get_width()/2, r[3]["settle_cyc"]),
+                          ha="center", va="bottom", fontsize=7)
+    ax[0, 1].set_xticks(xs); ax[0, 1].set_xticklabels(labels, rotation=35, ha="right", fontsize=8)
     ax[0, 1].set_title("Settle time (reference cycles)"); ax[0, 1].grid(axis="y", alpha=.3)
+    ax[0, 1].legend(handles=[plt.Rectangle((0,0),1,1,color=CTRLC["bangbang"]),
+                             plt.Rectangle((0,0),1,1,color=CTRLC["linear"])],
+                    labels=["bang-bang", "linear PI"], fontsize=8)
 
-    # (1,0) settle trajectories
+    # (1,0) acquisition trajectories — colour = controller, linestyle = DCO
     for r in rows:
-        ax[1, 0].plot(r[3]["traj"], color=CTRLC[r[1]], alpha=.7, lw=1,
-                      label=r[0] if r[2] == dcos[0] else None)
-    ax[1, 0].set_title("Acquisition trajectory (tune vs. window)")
-    ax[1, 0].set_xlabel("window"); ax[1, 0].set_ylabel("tune"); ax[1, 0].legend(fontsize=7); ax[1, 0].grid(alpha=.3)
+        ax[1, 0].plot(r[3]["traj"], color=CTRLC[r[1]], ls=DCOLS[r[2]], alpha=.85, lw=1.4,
+                      label=short(r[0]))
+    ax[1, 0].axhline(target_code, color="0.6", lw=1, ls="-.")
+    ax[1, 0].set_title("Acquisition trajectory (tune vs. window)\n"
+                       "bang-bang staircases overlap (DCO-independent); linear slews per curve")
+    ax[1, 0].set_xlabel("measurement window"); ax[1, 0].set_ylabel("tune code")
+    ax[1, 0].legend(fontsize=7, ncol=2); ax[1, 0].grid(alpha=.3)
 
     # (1,1) steady-state jitter bars
-    ax[1, 1].bar(xs, [r[3]["jitter_lsb"] for r in rows], color=[CTRLC[r[1]] for r in rows])
-    ax[1, 1].set_xticks(list(xs)); ax[1, 1].set_xticklabels(labels, rotation=40, ha="right", fontsize=8)
-    ax[1, 1].set_title("Steady-state jitter (code LSB)"); ax[1, 1].grid(axis="y", alpha=.3)
+    bars = ax[1, 1].bar(xs, [r[3]["jitter_lsb"] for r in rows], color=cols)
+    ax[1, 1].set_xticks(xs); ax[1, 1].set_xticklabels(labels, rotation=35, ha="right", fontsize=8)
+    ax[1, 1].set_title("Steady-state jitter (settled code spread, LSB)"); ax[1, 1].grid(axis="y", alpha=.3)
 
-    fig.suptitle("ADPLL 6-variant characterization (SPICE-curve-driven loop)", fontsize=13)
+    fig.suptitle("ADPLL 6-variant characterization — SPICE-curve-driven loop (gf180 3v3, TT)", fontsize=13)
     fig.tight_layout()
     out = os.path.join(out_dir, "pll_6variant.png")
     fig.savefig(out, dpi=130)

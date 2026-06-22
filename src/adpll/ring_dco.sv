@@ -32,6 +32,29 @@
 // per segment selects whether that delay is inserted (tune bit set) or bypassed, so the
 // inserted delay is proportional to the binary value of tune_i.
 //
+// Design choices, grounded in the ADPLL/DCO literature (see adpll_ctrl.sv for the full
+// reference list):
+//
+//   * Ring oscillator (not LC). An LC DCO with a switched MOS-varactor bank is the
+//     low-phase-noise choice for RF synthesis ([Staszewski2006 §2.1-2.3] frequency tuning
+//     via "MOS varactors" / "LC Tank"), but it needs an on-chip inductor and analog
+//     varactors. A ring is fully synthesizable from standard cells. The accepted
+//     trade-off is phase noise: ring-oscillator synthesizers "are all based on a ring
+//     oscillator structure which inherently features relatively poor phase-noise
+//     characteristics" [Staszewski2006]. Acceptable here — this is an observe-only test
+//     DCO, not an RF LO.
+//
+//   * Tune by switching delay elements (not bias current). For a ring DCO, the textbook
+//     method is current steering: [Kratyuk2007 §II] "In the case of a ring-oscillator-
+//     based DCO, frequency tuning can be performed by digitally turning on and off bias
+//     current sources." That needs a current DAC (analog). To stay in a pure standard-cell
+//     flow we instead switch unit delay stages in/out of the loop with mux2 cells, which
+//     is what makes the period digitally controllable without any analog bias network.
+//
+//   * Binary weighting (segment i = 2**i pairs) gives a monotonic, ~uniform-step
+//     period-vs-code curve from one mux per bit (NumTuneBits muxes), rather than a
+//     thermometer array of 2**N unit cells.
+//
 // It is a hard combinational loop, so every cell is instantiated from the gf180mcu 3v3
 // library by name with keep/dont_touch (synthesis/PnR must not dissolve the loop), its
 // real frequency-vs-code curve only exists after extraction (characterize in SPICE, see

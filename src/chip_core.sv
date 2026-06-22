@@ -395,7 +395,7 @@ adpll_csr #(
     .tune_i  (pll_tune)
 );
 
-adpll_ctrl #(
+adpll_controller_bangbang #(
     .NumTuneBits(7),
     .CountWidth (24),
     .DivWidth   (16)
@@ -410,7 +410,7 @@ adpll_ctrl #(
     .lock_o   (pll_lock)
 );
 
-ring_dco #(
+ring_dco_binary #(
     .NumTuneBits(7)
 ) i_pll_dco (
     .enable_i(pll_enable),

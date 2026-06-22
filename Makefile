@@ -149,7 +149,7 @@ sim-bridge: clone-pdk defines ## Bridge a UDP socket to the sim so dma.py drives
 	cd cocotb; TEST_MODULE=sim_udp_bridge PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} PAD=${PAD} SCL=${SCL} SRAM=${SRAM} python3 chip_top_tb.py
 .PHONY: sim-bridge
 
-ADPLL_RTL = $(wildcard src/adpll/*.sv src/adpll/dco/*.sv)
+ADPLL_RTL = $(wildcard src/adpll/*.sv src/adpll/controller/*.sv src/adpll/dco/*.sv)
 sim-adpll: ## Standalone digital ADPLL test: ring DCO (behavioural) + FLL lock (iverilog, no PDK)
 	mkdir -p cocotb/sim_build
 	iverilog -g2012 -o cocotb/sim_build/tb_adpll $(ADPLL_RTL) cocotb/models/tb_adpll.v
@@ -159,8 +159,8 @@ sim-adpll: ## Standalone digital ADPLL test: ring DCO (behavioural) + FLL lock (
 sim-adpll-csr: ## Integrated ADPLL: program mul/div/enable over AXI4-Lite CSR, poll STATUS for lock (iverilog)
 	mkdir -p cocotb/sim_build
 	iverilog -g2012 -o cocotb/sim_build/tb_adpll_csr \
-		src/csr/adpll_csr.sv src/adpll/adpll_ctrl.sv src/adpll/adpll_freq_meas.sv \
-		src/adpll/adpll_lock_detect.sv src/adpll/dco/ring_dco.sv cocotb/models/tb_adpll_csr.v
+		src/csr/adpll_csr.sv src/adpll/controller/adpll_controller_bangbang.sv src/adpll/adpll_freq_meas.sv \
+		src/adpll/adpll_lock_detect.sv src/adpll/dco/ring_dco_binary.sv cocotb/models/tb_adpll_csr.v
 	vvp cocotb/sim_build/tb_adpll_csr | grep -E "CSR programmed|LOCKED|PASS|FAIL"
 .PHONY: sim-adpll-csr
 

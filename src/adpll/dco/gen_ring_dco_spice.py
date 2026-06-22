@@ -6,7 +6,7 @@ Generate a SPICE deck for the ring_dco (binary-weighted DCO) from the gf180mcu 3
 standard cells, and (optionally) sweep the tune code with ngspice to extract the
 frequency-vs-code curve.
 
-The ring mirrors src/adpll/dco/ring_dco.sv exactly:
+The ring mirrors src/adpll/dco/ring_dco_binary.sv exactly:
     node0          = NAND2(enable, feedback)              # gate + the single inversion
     node[i+1]      = MUX2(A=node[i], B=delay_2^i(node[i]), S=tune[i])
     feedback,clk_o = node[NumTuneBits]

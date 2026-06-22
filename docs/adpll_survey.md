@@ -29,7 +29,7 @@ A programmable-ratio frequency synthesizer, the canonical ADPLL pipeline
             +-------------------+   +-----------+   +-----+
   F_clk_i ->| adpll_freq_meas   |-->| loop      |-->| ring|--> clk_o (F_DCO)
             | (edge count over  |   | filter    |   | DCO |--+
-            |  div_i cycles)    |   |(adpll_ctrl|   +-----+  |
+            |  div_i cycles)    |   |(adpll_controller_bangbang|   +-----+  |
             +-------------------+   | _*)       |            |
                     ^               +-----------+            |
                     +----------- DCO edges (Gray-CDC) -------+
@@ -64,7 +64,7 @@ current DAC.
 
 | module | architecture | trade-off |
 |---|---|---|
-| `ring_dco` | binary-weighted delay select (segment i = 2^i pairs, N muxes) | smallest (N muxes); binary weighting can be non-monotonic at major carries |
+| `ring_dco_binary` | binary-weighted delay select (segment i = 2^i pairs, N muxes) | smallest (N muxes); binary weighting can be non-monotonic at major carries |
 | `ring_dco_thermometer` | unit-weighted (thermometer) delay select, 2^N identical stages | monotonic by construction; mismatch can be averaged with DEM [Staszewski2006 §3.5]; costs 2^N cells |
 | `ring_dco_muxtap` | variable ring **length** via a 2^N:1 tap mux tree (Kajiwara–Nakagawa style) | re-routes feedback instead of inserting delay; fixed mux-tree delay floor |
 
@@ -76,8 +76,8 @@ filter consists of a proportional path with a gain α and an integral path with 
 
 | module | loop filter | source |
 |---|---|---|
-| `adpll_ctrl` | **bang-bang** PI: 1-bit (sign) error, integer gains | [Hanumolu2007 §IV-A] *"A DFF simply detects the sign of the phase error and hence serves as a 1-bit TDC"*; bang-bang dynamics [DaDalt2004] |
-| `adpll_ctrl_linear` | **linear** PI: multi-bit error, power-of-two α/β shifts, anti-windup | full [Kratyuk2007] procedure; gains quantized to powers of two ([Kratyuk2007 §V] *"α ≈ 2⁻³, β ≈ 2⁻⁷"*) |
+| `adpll_controller_bangbang` | **bang-bang** PI: 1-bit (sign) error, integer gains | [Hanumolu2007 §IV-A] *"A DFF simply detects the sign of the phase error and hence serves as a 1-bit TDC"*; bang-bang dynamics [DaDalt2004] |
+| `adpll_controller_linear` | **linear** PI: multi-bit error, power-of-two α/β shifts, anti-windup | full [Kratyuk2007] procedure; gains quantized to powers of two ([Kratyuk2007 §V] *"α ≈ 2⁻³, β ≈ 2⁻⁷"*) |
 
 ## Results
 
@@ -97,7 +97,7 @@ time. Finding: the linear PI is faster and more accurate *once gains are matched
 on a coarse DCO it needs that care (small α / integral-dominant acquisition); the bang-bang
 needs none and is inherently PVT-robust — which is why bang-bang dominates coarse ADPLLs.
 
-### DCO across PVT corners — `make dco-spice-corners` (ngspice ≥ 42, `ring_dco`, 7-bit)
+### DCO across PVT corners — `make dco-spice-corners` (ngspice ≥ 42, `ring_dco_binary`, 7-bit)
 
 Fine code sweep (raw data in `figures/corner_*.dat`):
 

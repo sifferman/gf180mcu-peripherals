@@ -24,7 +24,11 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-// ring_dco
+// ring_dco_binary
+//
+// Primary source: all-digital DCO / ring-oscillator tuning -- R. B. Staszewski & P. T.
+// Balsara, "All-Digital Frequency Synthesizer in Deep-Submicron CMOS," Wiley 2006
+// [Staszewski2006].
 //
 // Digitally-controlled ring oscillator: one NAND2 gate (gates oscillation with enable_i
 // and contributes the single inversion that sustains the ring) followed by NumTuneBits
@@ -32,7 +36,7 @@
 // per segment selects whether that delay is inserted (tune bit set) or bypassed, so the
 // inserted delay is proportional to the binary value of tune_i.
 //
-// Design choices, grounded in the ADPLL/DCO literature (see adpll_ctrl.sv for the full
+// Design choices, grounded in the ADPLL/DCO literature (see adpll_controller_bangbang.sv for the full
 // reference list):
 //
 //   * Ring oscillator (not LC). An LC DCO with a switched MOS-varactor bank is the
@@ -61,13 +65,13 @@
 // `make dco-spice`), and event-driven sim cannot evaluate a zero-delay loop so a
 // behavioural clock-generator is compiled (ifndef SYNTHESIS) instead. Standalone observe-
 // only block: it does not clock the core; enable_i/tune_i come from a CSR and clk_o/lock
-// reach the analog pads via adpll_ctrl.
+// reach the analog pads via adpll_controller_bangbang.
 
 `timescale 1ns/1ps   // needed by the behavioural (ifndef SYNTHESIS) model's #-delays
 `default_nettype none
 
 (* keep_hierarchy *)
-module ring_dco #(
+module ring_dco_binary #(
     parameter int unsigned NumTuneBits = 7
 ) (
     input  wire                   enable_i,

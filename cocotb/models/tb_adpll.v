@@ -3,8 +3,8 @@
 // Survey testbench for the digital ADPLL (ring DCO + frequency-locked controller). Runs
 // under Icarus (SYNTHESIS undefined) so the DCO compiles its behavioural clock model. Selects the
 // controller and DCO variant with plusdefines (testbench-only, not RTL):
-//   default              : adpll_ctrl (bang-bang PI) + ring_dco (binary)
-//   -DCTRL_LINEAR         : adpll_ctrl_linear (linear PI)
+//   default              : adpll_controller_bangbang (bang-bang PI) + ring_dco_binary (binary)
+//   -DCTRL_LINEAR         : adpll_controller_linear (linear PI)
 //   -DDCO_THERM / -DDCO_MUXTAP : the thermometer / mux-tap DCO
 //
 // The controller drives F_DCO = (mul/div)*F_ref. With the behavioural DCO (half-period
@@ -36,13 +36,13 @@ module tb_adpll;
 `elsif DCO_MUXTAP
   ring_dco_muxtap      #(.NumTuneBits(NUM_TUNE)) u_dco (.enable_i(enable), .tune_i(tune), .clk_o(dco_clk));
 `else
-  ring_dco             #(.NumTuneBits(NUM_TUNE)) u_dco (.enable_i(enable), .tune_i(tune), .clk_o(dco_clk));
+  ring_dco_binary             #(.NumTuneBits(NUM_TUNE)) u_dco (.enable_i(enable), .tune_i(tune), .clk_o(dco_clk));
 `endif
 
 `ifdef CTRL_LINEAR
-  adpll_ctrl_linear #(.NumTuneBits(NUM_TUNE), .CountWidth(CNT_W), .DivWidth(DIV_W)) u_ctrl (
+  adpll_controller_linear #(.NumTuneBits(NUM_TUNE), .CountWidth(CNT_W), .DivWidth(DIV_W)) u_ctrl (
 `else
-  adpll_ctrl        #(.NumTuneBits(NUM_TUNE), .CountWidth(CNT_W), .DivWidth(DIV_W)) u_ctrl (
+  adpll_controller_bangbang        #(.NumTuneBits(NUM_TUNE), .CountWidth(CNT_W), .DivWidth(DIV_W)) u_ctrl (
 `endif
       .clk_i(clk), .rst_ni(rst_n), .enable_i(enable),
       .mul_i(CNT_W'(MUL)), .div_i(DIV_W'(DIV)), .dco_clk_i(dco_clk),

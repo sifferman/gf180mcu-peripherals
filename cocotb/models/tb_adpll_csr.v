@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Unit test for the integrated ADPLL subsystem: adpll_csr (AXI4-Lite) -> adpll_ctrl
-// (bang-bang PI) -> ring_dco (behavioural). Drives the CSR exactly as the on-chip
+// Unit test for the integrated ADPLL subsystem: adpll_csr (AXI4-Lite) -> adpll_controller_bangbang
+// (bang-bang PI) -> ring_dco_binary (behavioural). Drives the CSR exactly as the on-chip
 // fabric does -- writes MUL/DIV then sets CTRL.enable -- and polls the STATUS register
 // until the lock bit reads back, mirroring how a host would over Ethernet. Runs under
 // Icarus (SYNTHESIS undefined, behavioural DCO). PASSes on lock with an in-range tune.
@@ -46,13 +46,13 @@ module tb_adpll_csr;
       .enable_o(enable), .mul_o(mul), .div_o(div), .lock_i(lock), .tune_i(tune)
   );
 
-  adpll_ctrl #(.NumTuneBits(NUM_TUNE), .CountWidth(CNT_W), .DivWidth(DIV_W)) u_ctrl (
+  adpll_controller_bangbang #(.NumTuneBits(NUM_TUNE), .CountWidth(CNT_W), .DivWidth(DIV_W)) u_ctrl (
       .clk_i(clk), .rst_ni(rst_n), .enable_i(enable),
       .mul_i(mul), .div_i(div), .dco_clk_i(dco_clk),
       .tune_o(tune), .lock_o(lock)
   );
 
-  ring_dco #(.NumTuneBits(NUM_TUNE)) u_dco (.enable_i(enable), .tune_i(tune), .clk_o(dco_clk));
+  ring_dco_binary #(.NumTuneBits(NUM_TUNE)) u_dco (.enable_i(enable), .tune_i(tune), .clk_o(dco_clk));
 
   task axil_write(input [31:0] addr, input [31:0] data);
     begin

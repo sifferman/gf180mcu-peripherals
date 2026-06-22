@@ -24,7 +24,11 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-// adpll_ctrl
+// adpll_controller_bangbang
+//
+// Primary source: bang-bang loop dynamics -- J. Lee, K. Kundert & B. Razavi, IEEE JSSC
+// 39(9), 2004 [DaDalt2004]; the 1-bit DFF-sign phase detector -- Hanumolu et al., IEEE
+// CICC 2007 [Hanumolu2007]. Synthesizer framing per Kratyuk et al., IEEE TCAS-II 2007.
 //
 // All-digital frequency-locked loop controller (bang-bang loop filter) that tunes a ring
 // DCO so F_DCO = (mul_i / div_i) * F_clk_i, the programmable-ratio synthesizer of the ADPLL
@@ -66,7 +70,7 @@
 
 `default_nettype none
 
-module adpll_ctrl #(
+module adpll_controller_bangbang #(
     parameter int unsigned NumTuneBits      = 7,
     parameter int unsigned CountWidth       = 24,
     parameter int unsigned DivWidth         = 16,

@@ -19,16 +19,16 @@ variant survey, the citations, and the simulation results live in
 ```
 adpll_freq_meas.sv     shared: Gray-CDC DCO-edge counter over a runtime div_i-cycle window
 adpll_lock_detect.sv   shared: code-band lock detector
-adpll_ctrl.sv          controller: bang-bang PI loop filter (1-bit/sign error)
-adpll_ctrl_linear.sv   controller: linear PI loop filter (multi-bit error, power-of-two gains)
+adpll_controller_bangbang.sv          controller: bang-bang PI loop filter (1-bit/sign error)
+adpll_controller_linear.sv   controller: linear PI loop filter (multi-bit error, power-of-two gains)
 dco/
-  ring_dco.sv              DCO: binary-weighted delay-select ring (the default)
+  ring_dco_binary.sv              DCO: binary-weighted delay-select ring (the default)
   ring_dco_thermometer.sv  DCO: unit-weighted (thermometer) ring, monotonic by construction
   ring_dco_muxtap.sv       DCO: variable-length ring (tap mux tree)
   gen_ring_dco_spice.py    emit a SPICE deck for a ring DCO and sweep tune codes in ngspice
 ```
 
-A controller (`adpll_ctrl*`) + a DCO (`ring_dco*`) form a loop; the two shared blocks are
+A controller (`adpll_controller_bangbang*`) + a DCO (`ring_dco_binary*`) form a loop; the two shared blocks are
 common to every controller. All variants share the same port interfaces, so they are
 drop-in swappable.
 

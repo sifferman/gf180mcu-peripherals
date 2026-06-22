@@ -26,8 +26,11 @@
 
 // ring_dco_thermometer
 //
+// Primary source: thermometer (unit-weighted) tuning + dynamic element matching --
+// Staszewski & Balsara, Wiley 2006, Sec. 3.5 [Staszewski2006].
+//
 // DCO survey variant: a ring oscillator tuned by a UNIT-weighted (thermometer) delay
-// line, in contrast to ring_dco's binary weighting. The binary input tune_i is
+// line, in contrast to ring_dco_binary's binary weighting. The binary input tune_i is
 // thermometer-decoded so that code k inserts exactly k identical unit delay stages (each
 // one inverter pair) into the loop, every stage gated by its own mux2.
 //
@@ -39,10 +42,10 @@
 // construction; mismatch can be further averaged with dynamic element matching, the
 // approach Staszewski uses for the DCO varactor bank: [Staszewski2006 §3.5] frequency
 // resolution improved "through Sigma-Delta dithering and dynamic element matching." The
-// cost is area: 2**NumTuneBits-1 unit cells + muxes versus ring_dco's N muxes.
+// cost is area: 2**NumTuneBits-1 unit cells + muxes versus ring_dco_binary's N muxes.
 //
-// Same enable_i/tune_i/clk_o interface as ring_dco, so the two are drop-in swappable in
-// adpll_ctrl. See adpll_ctrl.sv for the full reference list and src/adpll/README.md.
+// Same enable_i/tune_i/clk_o interface as ring_dco_binary, so the two are drop-in swappable in
+// adpll_controller_bangbang. See adpll_controller_bangbang.sv for the full reference list and src/adpll/README.md.
 
 `timescale 1ns/1ps   // needed by the behavioural (ifndef SYNTHESIS) model's #-delays
 `default_nettype none
@@ -104,7 +107,7 @@ assign clk_o    = node[NumUnits];
 `else
 
 // Behavioural model: half-period grows linearly with the number of inserted units, i.e.
-// with the binary value of tune_i -- the same monotonic curve as ring_dco's behavioural
+// with the binary value of tune_i -- the same monotonic curve as ring_dco_binary's behavioural
 // model (the two differ only in silicon DNL, which a zero-delay sim cannot show).
 localparam integer BaseHalfPs = 1000;
 localparam integer StepHalfPs = 100;

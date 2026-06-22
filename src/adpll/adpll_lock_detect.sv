@@ -32,7 +32,7 @@
 // after LockWindows consecutive in-band samples it asserts lock_o, and any larger excursion
 // (the loop still slewing) re-centres the band and drops lock. Watching the slow control
 // code rather than the instantaneous frequency error is what makes lock detection robust to
-// the inherent +-1 LSB limit cycle of a bang-bang loop [DaDalt2004] (see adpll_ctrl.sv).
+// the inherent +-1 LSB limit cycle of a bang-bang loop [DaDalt2004] (see adpll_controller_bangbang.sv).
 
 `default_nettype none
 

@@ -24,12 +24,16 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-// adpll_ctrl_linear
+// adpll_controller_linear
+//
+// Primary source: digital proportional-integral loop filter, full design procedure with
+// power-of-two alpha/beta gains -- Kratyuk, Hanumolu, Moon & Mayaram, IEEE TCAS-II 54(3),
+// 2007 [Kratyuk2007].
 //
 // Controller survey variant: the LINEAR proportional-integral loop filter, the full
-// design-procedure form from [Kratyuk2007], in contrast to adpll_ctrl's 1-bit (bang-bang)
+// design-procedure form from [Kratyuk2007], in contrast to adpll_controller_bangbang's 1-bit (bang-bang)
 // error. Same synthesizer interface (mul_i = N, div_i = M; F_DCO = (mul/div)*F_clk_i) and
-// the same shared front end / lock detector as adpll_ctrl; only the loop filter differs.
+// the same shared front end / lock detector as adpll_controller_bangbang; only the loop filter differs.
 // It uses the multi-bit frequency error directly:
 //
 //   e[n]    = measured[n] - mul                    (signed frequency error, edges/window)
@@ -43,11 +47,11 @@
 // 2^-7"); the alpha/beta ratio sets the phase margin [Kratyuk2007 Eq.20]. Versus the
 // bang-bang sibling: faster acquisition (the proportional term slews with the error, not
 // +-1 LSB/window) and no limit cycle away from transients, at the cost of gains that must be
-// matched to K_DCO plus the anti-windup clamp. See adpll_ctrl.sv for the reference list.
+// matched to K_DCO plus the anti-windup clamp. See adpll_controller_bangbang.sv for the reference list.
 
 `default_nettype none
 
-module adpll_ctrl_linear #(
+module adpll_controller_linear #(
     parameter int unsigned NumTuneBits = 7,
     parameter int unsigned CountWidth  = 24,
     parameter int unsigned DivWidth    = 16,

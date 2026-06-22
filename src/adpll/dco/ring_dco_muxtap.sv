@@ -26,18 +26,21 @@
 
 // ring_dco_muxtap
 //
+// Primary source: digitally-controlled variable-length ring -- Kajiwara & Nakagawa (early
+// digital frequency synthesizer, cited in Staszewski & Balsara, Wiley 2006, Sec. 1).
+//
 // DCO survey variant: a variable-LENGTH ring. A single inverter-pair delay chain produces
 // 2**NumTuneBits taps; a 2**NumTuneBits:1 mux tree (binary, one tune bit per level) selects
 // which tap closes the loop back to the gate, so tune_i sets the ring length directly.
 // This is the classic digitally-controlled ring of Kajiwara & Nakagawa (noted as an early
-// digital frequency synthesizer in [Staszewski2006 §1]); it differs from ring_dco /
+// digital frequency synthesizer in [Staszewski2006 §1]); it differs from ring_dco_binary /
 // ring_dco_thermometer, where the signal always traverses every stage and muxes insert or
 // bypass delay rather than re-route the feedback.
 //
 // Trade-off: the feedback always passes through the full NumTuneBits-deep mux tree, which
 // adds a fixed delay floor and loads the tap nodes -- but the active loop only contains the
 // selected number of inverter pairs. Same enable_i/tune_i/clk_o interface as the other DCOs
-// (drop-in swappable in adpll_ctrl). See adpll_ctrl.sv for the reference list.
+// (drop-in swappable in adpll_controller_bangbang). See adpll_controller_bangbang.sv for the reference list.
 
 `timescale 1ns/1ps   // needed by the behavioural (ifndef SYNTHESIS) model's #-delays
 `default_nettype none

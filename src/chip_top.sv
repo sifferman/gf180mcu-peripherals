@@ -89,7 +89,7 @@ module chip_top #(
 
     // Power/ground pad instances
     generate
-    for (genvar i=0; i<NUM_DVDD_PADS; i++) begin : dvdd_pads
+    for (genvar i_GEN=0; i_GEN<NUM_DVDD_PADS; i_GEN++) begin : dvdd_pads
         (* keep *)
         `gf180mcu_xxx_io__dvdd pad (
             `ifdef USE_POWER_PINS
@@ -107,7 +107,7 @@ module chip_top #(
             `endif
         );
     end
-    for (genvar i=0; i<NUM_DVSS_PADS; i++) begin : dvss_pads
+    for (genvar i_GEN=0; i_GEN<NUM_DVSS_PADS; i_GEN++) begin : dvss_pads
         (* keep *)
         `gf180mcu_xxx_io__dvss pad (
             `ifdef USE_POWER_PINS
@@ -125,7 +125,7 @@ module chip_top #(
             `endif
         );
     end
-    for (genvar i=0; i<NUM_VDD_PADS; i++) begin : vdd_pads
+    for (genvar i_GEN=0; i_GEN<NUM_VDD_PADS; i_GEN++) begin : vdd_pads
         (* keep *)
         `gf180mcu_xxx_io__vdd pad (
             `ifdef USE_POWER_PINS
@@ -143,7 +143,7 @@ module chip_top #(
             `endif
         );
     end
-    for (genvar i=0; i<NUM_VSS_PADS; i++) begin : vss_pads
+    for (genvar i_GEN=0; i_GEN<NUM_VSS_PADS; i_GEN++) begin : vss_pads
         (* keep *)
         `gf180mcu_xxx_io__vss pad (
             `ifdef USE_POWER_PINS
@@ -198,7 +198,7 @@ module chip_top #(
     );
 
     generate
-    for (genvar i=0; i<NUM_INPUT_PADS; i++) begin : inputs
+    for (genvar i_GEN=0; i_GEN<NUM_INPUT_PADS; i_GEN++) begin : inputs
         (* keep *)
         `gf180mcu_xxx_io__in_c pad (
             `ifdef USE_POWER_PINS
@@ -208,17 +208,17 @@ module chip_top #(
             .VSS    (VSS),
             `endif
         
-            .Y      (input_PAD2CORE[i]),
-            .PAD    (input_PAD[i]),
+            .Y      (input_PAD2CORE[i_GEN]),
+            .PAD    (input_PAD[i_GEN]),
             
-            .PU     (input_CORE2PAD_PU[i]),
-            .PD     (input_CORE2PAD_PD[i])
+            .PU     (input_CORE2PAD_PU[i_GEN]),
+            .PD     (input_CORE2PAD_PD[i_GEN])
         );
     end
     endgenerate
 
     generate
-    for (genvar i=0; i<NUM_BIDIR_PADS; i++) begin : bidir
+    for (genvar i_GEN=0; i_GEN<NUM_BIDIR_PADS; i_GEN++) begin : bidir
         (* keep *)
         `gf180mcu_xxx_io__bi_24t pad (
             `ifdef USE_POWER_PINS
@@ -228,23 +228,23 @@ module chip_top #(
             .VSS    (VSS),
             `endif
         
-            .A      (bidir_CORE2PAD[i]),
-            .OE     (bidir_CORE2PAD_OE[i]),
-            .Y      (bidir_PAD2CORE[i]),
-            .PAD    (bidir_PAD[i]),
+            .A      (bidir_CORE2PAD[i_GEN]),
+            .OE     (bidir_CORE2PAD_OE[i_GEN]),
+            .Y      (bidir_PAD2CORE[i_GEN]),
+            .PAD    (bidir_PAD[i_GEN]),
             
-            .CS     (bidir_CORE2PAD_CS[i]),
-            .SL     (bidir_CORE2PAD_SL[i]),
-            .IE     (bidir_CORE2PAD_IE[i]),
+            .CS     (bidir_CORE2PAD_CS[i_GEN]),
+            .SL     (bidir_CORE2PAD_SL[i_GEN]),
+            .IE     (bidir_CORE2PAD_IE[i_GEN]),
 
-            .PU     (bidir_CORE2PAD_PU[i]),
-            .PD     (bidir_CORE2PAD_PD[i])
+            .PU     (bidir_CORE2PAD_PU[i_GEN]),
+            .PD     (bidir_CORE2PAD_PD[i_GEN])
         );
     end
     endgenerate
 
     generate
-    for (genvar i=0; i<NUM_ANALOG_PADS; i++) begin : analog
+    for (genvar i_GEN=0; i_GEN<NUM_ANALOG_PADS; i_GEN++) begin : analog
         (* keep *)
         `gf180mcu_xxx_io__asig_5p0 pad (
             `ifdef USE_POWER_PINS
@@ -253,7 +253,7 @@ module chip_top #(
             .VDD    (VDD),
             .VSS    (VSS),
             `endif
-            .ASIG5V (analog_PAD[i])
+            .ASIG5V (analog_PAD[i_GEN])
         );
     end
     endgenerate

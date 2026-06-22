@@ -116,12 +116,12 @@ Living tracker. See `questions.md` for decisions/risks and
   manufacturability; IR-drop skipped, no VSRC_LOC_FILES.) The earlier full run
   RUN_2026-06-21_09-13-01 was OOM-killed at step 31 during a 3-job load spike; this restart ran
   clean. This GDS supersedes the XOR-fold M2 GDS with the true CRC — tapeout-current.
-- **M4 digital PLL added** (commit, src/dpll/): binary-weighted mux-chain ring DCO
+- **M4 digital PLL added** (commit, src/adpll/): binary-weighted mux-chain ring DCO
   (`ring_dco.sv`, structural gf180 cells + dont_touch, behavioural sim model) +
-  bang-bang frequency-locked control (`dpll_ctrl.sv`, Gray-CDC edge counter, tune-band lock).
-  `make sim-dpll` PASS (DCO oscillates monotonically with tune; FLL converges and locks).
+  bang-bang frequency-locked control (`adpll_ctrl.sv`, Gray-CDC edge counter, tune-band lock).
+  `make sim-adpll` PASS (DCO oscillates monotonically with tune; FLL converges and locks).
   Standalone IP — not yet wired into chip_top (CSR control + analog observe pads = later step).
-- **DCO SPICE characterized** (`src/dpll/gen_ring_dco_spice.py`, `make dco-spice`): exports the
+- **DCO SPICE characterized** (`src/adpll/gen_ring_dco_spice.py`, `make dco-spice`): exports the
   ring from gf180 transistor-level cell subckts and sweeps tune codes through ngspice
   (needs ngspice >= 42 for the BSIM4 models; the system ngspice-34 is too old — used the nix
   ngspice-45). Low codes give the expected monotonic tuning (code 0 ~337 MHz -> code 16

@@ -31,30 +31,30 @@ module tb_m2_fabric;
     wire m1_awvalid,m1_awready,m1_wvalid,m1_wready,m1_bvalid,m1_bready,m1_arvalid,m1_arready,m1_rvalid,m1_rready;
 
     axil_interconnect #(.SelBit(28)) ic (
-        .u_awaddr_i(awaddr),.u_awprot_i(3'b0),.u_awvalid_i(awvalid),.u_awready_o(awready),
-        .u_wdata_i(wdata),.u_wstrb_i(wstrb),.u_wvalid_i(wvalid),.u_wready_o(wready),
-        .u_bresp_o(bresp),.u_bvalid_o(bvalid),.u_bready_i(bready),
-        .u_araddr_i(araddr),.u_arprot_i(3'b0),.u_arvalid_i(arvalid),.u_arready_o(arready),
-        .u_rdata_o(rdata),.u_rresp_o(rresp),.u_rvalid_o(rvalid),.u_rready_i(rready),
-        .m0_awaddr_o(m0_awaddr),.m0_awprot_o(m0_awprot),.m0_awvalid_o(m0_awvalid),.m0_awready_i(m0_awready),
-        .m0_wdata_o(m0_wdata),.m0_wstrb_o(m0_wstrb),.m0_wvalid_o(m0_wvalid),.m0_wready_i(m0_wready),
-        .m0_bresp_i(m0_bresp),.m0_bvalid_i(m0_bvalid),.m0_bready_o(m0_bready),
-        .m0_araddr_o(m0_araddr),.m0_arprot_o(m0_arprot),.m0_arvalid_o(m0_arvalid),.m0_arready_i(m0_arready),
-        .m0_rdata_i(m0_rdata),.m0_rresp_i(m0_rresp),.m0_rvalid_i(m0_rvalid),.m0_rready_o(m0_rready),
-        .m1_awaddr_o(m1_awaddr),.m1_awprot_o(m1_awprot),.m1_awvalid_o(m1_awvalid),.m1_awready_i(m1_awready),
-        .m1_wdata_o(m1_wdata),.m1_wstrb_o(m1_wstrb),.m1_wvalid_o(m1_wvalid),.m1_wready_i(m1_wready),
-        .m1_bresp_i(m1_bresp),.m1_bvalid_i(m1_bvalid),.m1_bready_o(m1_bready),
-        .m1_araddr_o(m1_araddr),.m1_arprot_o(m1_arprot),.m1_arvalid_o(m1_arvalid),.m1_arready_i(m1_arready),
-        .m1_rdata_i(m1_rdata),.m1_rresp_i(m1_rresp),.m1_rvalid_i(m1_rvalid),.m1_rready_o(m1_rready)
+        .s_axil_awaddr(awaddr),.s_axil_awprot(3'b0),.s_axil_awvalid(awvalid),.s_axil_awready(awready),
+        .s_axil_wdata(wdata),.s_axil_wstrb(wstrb),.s_axil_wvalid(wvalid),.s_axil_wready(wready),
+        .s_axil_bresp(bresp),.s_axil_bvalid(bvalid),.s_axil_bready(bready),
+        .s_axil_araddr(araddr),.s_axil_arprot(3'b0),.s_axil_arvalid(arvalid),.s_axil_arready(arready),
+        .s_axil_rdata(rdata),.s_axil_rresp(rresp),.s_axil_rvalid(rvalid),.s_axil_rready(rready),
+        .m0_axil_awaddr(m0_awaddr),.m0_axil_awprot(m0_awprot),.m0_axil_awvalid(m0_awvalid),.m0_axil_awready(m0_awready),
+        .m0_axil_wdata(m0_wdata),.m0_axil_wstrb(m0_wstrb),.m0_axil_wvalid(m0_wvalid),.m0_axil_wready(m0_wready),
+        .m0_axil_bresp(m0_bresp),.m0_axil_bvalid(m0_bvalid),.m0_axil_bready(m0_bready),
+        .m0_axil_araddr(m0_araddr),.m0_axil_arprot(m0_arprot),.m0_axil_arvalid(m0_arvalid),.m0_axil_arready(m0_arready),
+        .m0_axil_rdata(m0_rdata),.m0_axil_rresp(m0_rresp),.m0_axil_rvalid(m0_rvalid),.m0_axil_rready(m0_rready),
+        .m1_axil_awaddr(m1_awaddr),.m1_axil_awprot(m1_awprot),.m1_axil_awvalid(m1_awvalid),.m1_axil_awready(m1_awready),
+        .m1_axil_wdata(m1_wdata),.m1_axil_wstrb(m1_wstrb),.m1_axil_wvalid(m1_wvalid),.m1_axil_wready(m1_wready),
+        .m1_axil_bresp(m1_bresp),.m1_axil_bvalid(m1_bvalid),.m1_axil_bready(m1_bready),
+        .m1_axil_araddr(m1_araddr),.m1_axil_arprot(m1_arprot),.m1_axil_arvalid(m1_arvalid),.m1_axil_arready(m1_arready),
+        .m1_axil_rdata(m1_rdata),.m1_axil_rresp(m1_rresp),.m1_axil_rvalid(m1_rvalid),.m1_axil_rready(m1_rready)
     );
 
     axil_ram #(.Words(256)) sram (
         .clk_i(clk),.rst_ni(rst_n),
-        .s_awaddr_i(m0_awaddr),.s_awprot_i(m0_awprot),.s_awvalid_i(m0_awvalid),.s_awready_o(m0_awready),
-        .s_wdata_i(m0_wdata),.s_wstrb_i(m0_wstrb),.s_wvalid_i(m0_wvalid),.s_wready_o(m0_wready),
-        .s_bresp_o(m0_bresp),.s_bvalid_o(m0_bvalid),.s_bready_i(m0_bready),
-        .s_araddr_i(m0_araddr),.s_arprot_i(m0_arprot),.s_arvalid_i(m0_arvalid),.s_arready_o(m0_arready),
-        .s_rdata_o(m0_rdata),.s_rresp_o(m0_rresp),.s_rvalid_o(m0_rvalid),.s_rready_i(m0_rready)
+        .s_axil_awaddr(m0_awaddr),.s_axil_awprot(m0_awprot),.s_axil_awvalid(m0_awvalid),.s_axil_awready(m0_awready),
+        .s_axil_wdata(m0_wdata),.s_axil_wstrb(m0_wstrb),.s_axil_wvalid(m0_wvalid),.s_axil_wready(m0_wready),
+        .s_axil_bresp(m0_bresp),.s_axil_bvalid(m0_bvalid),.s_axil_bready(m0_bready),
+        .s_axil_araddr(m0_araddr),.s_axil_arprot(m0_arprot),.s_axil_arvalid(m0_arvalid),.s_axil_arready(m0_arready),
+        .s_axil_rdata(m0_rdata),.s_axil_rresp(m0_rresp),.s_axil_rvalid(m0_rvalid),.s_axil_rready(m0_rready)
     );
 
     wire [15:0] dq, dq_o, dq_i; wire dq_oe;
@@ -63,12 +63,12 @@ module tb_m2_fabric;
     assign dq_i = dq;
 
     sdram_wrap sdram (
-        .clk_i(clk),.rst_i(rst),
-        .s_awaddr_i(m1_awaddr),.s_awprot_i(m1_awprot),.s_awvalid_i(m1_awvalid),.s_awready_o(m1_awready),
-        .s_wdata_i(m1_wdata),.s_wstrb_i(m1_wstrb),.s_wvalid_i(m1_wvalid),.s_wready_o(m1_wready),
-        .s_bresp_o(m1_bresp),.s_bvalid_o(m1_bvalid),.s_bready_i(m1_bready),
-        .s_araddr_i(m1_araddr),.s_arprot_i(m1_arprot),.s_arvalid_i(m1_arvalid),.s_arready_o(m1_arready),
-        .s_rdata_o(m1_rdata),.s_rresp_o(m1_rresp),.s_rvalid_o(m1_rvalid),.s_rready_i(m1_rready),
+        .clk_i(clk),.rst_ni(rst_n),
+        .s_axil_awaddr(m1_awaddr),.s_axil_awprot(m1_awprot),.s_axil_awvalid(m1_awvalid),.s_axil_awready(m1_awready),
+        .s_axil_wdata(m1_wdata),.s_axil_wstrb(m1_wstrb),.s_axil_wvalid(m1_wvalid),.s_axil_wready(m1_wready),
+        .s_axil_bresp(m1_bresp),.s_axil_bvalid(m1_bvalid),.s_axil_bready(m1_bready),
+        .s_axil_araddr(m1_araddr),.s_axil_arprot(m1_arprot),.s_axil_arvalid(m1_arvalid),.s_axil_arready(m1_arready),
+        .s_axil_rdata(m1_rdata),.s_axil_rresp(m1_rresp),.s_axil_rvalid(m1_rvalid),.s_axil_rready(m1_rready),
         .sdram_clk_o(s_clk),.sdram_cke_o(s_cke),.sdram_cs_o(s_cs),.sdram_ras_o(s_ras),
         .sdram_cas_o(s_cas),.sdram_we_o(s_we),.sdram_dqm_o(s_dqm),.sdram_addr_o(s_addr),
         .sdram_ba_o(s_ba),.sdram_dq_o(dq_o),.sdram_dq_oe_o(dq_oe),.sdram_dq_i(dq_i)

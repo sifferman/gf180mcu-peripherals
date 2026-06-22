@@ -1,7 +1,36 @@
-// Register a bus on the FALLING edge of a clock (a half-cycle delay).
+// Copyright (c) 2026 Ethan Sifferman
 //
-// Generic and project-independent.  One use is source-synchronous outputs that
-// must be launched half a clock before the receiver's rising sampling edge.
+// Redistribution and use in source and binary forms, with or without modification, are permitted
+// provided that the following conditions are met:
+//
+// 1. Redistributions of source code must retain the above copyright notice, this list of
+//    conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright notice, this list of
+//    conditions and the following disclaimer in the documentation and/or other materials provided
+//    with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its contributors may be used to
+//    endorse or promote products derived from this software without specific prior written
+//    permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR
+// IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+// FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+// OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+
+// delay_to_negedge
+//
+// Registers a bus on the falling edge of clk_i, a half-cycle delay. Used for
+// source-synchronous outputs that must launch half a clock before the receiver's
+// rising sampling edge (here, the RMII TX di-bits to the LAN8720).
+
+`default_nettype none
 
 module delay_to_negedge #(
     parameter int unsigned Width = 1
@@ -10,7 +39,11 @@ module delay_to_negedge #(
     input  wire [Width-1:0] d_i,
     output wire [Width-1:0] q_o
 );
-    logic [Width-1:0] q = '0;
-    always_ff @(negedge clk_i) q <= d_i;
-    assign q_o = q;
+
+logic [Width-1:0] negedge_q;
+always_ff @(negedge clk_i) negedge_q <= d_i;
+assign q_o = negedge_q;
+
 endmodule
+
+`default_nettype wire

@@ -174,8 +174,9 @@ dco-spice: clone-pdk ## Export ring_dco to SPICE and sweep tune codes through ng
 		--bits 7 --sweep 0,4,8,16,32,64,96,127 --run --workdir cocotb/sim_build
 .PHONY: dco-spice
 
-# DCO_VARIANT selects the module gen_ring_dco_spice builds (ring_dco / ring_dco_thermometer /
-# ring_dco_muxtap). DCO_BITS trims the ring for faster corner runs.
+# Corner DCO characterization uses the binary ring_dco (what gen_ring_dco_spice emits).
+# DCO_BITS trims the ring for faster corner runs (the thermometer/muxtap variants share the
+# same behavioural curve; their structural SPICE emitters are a follow-up).
 DCO_BITS ?= 7
 dco-spice-corners: clone-pdk ## DCO freq-vs-code across SS/TT/FF PVT corners (ngspice) -- run regularly
 	@for corner in "ss 3.0 125" "typical 3.3 25" "ff 3.6 -40"; do \

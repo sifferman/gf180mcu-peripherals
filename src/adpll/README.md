@@ -17,20 +17,28 @@ variant survey, the citations, and the simulation results live in
 ## Layout
 
 ```
-adpll_freq_counter.sv     shared: Gray-CDC DCO-edge counter over a runtime-length measurement window
-adpll_lock_detect.sv   shared: lock detector (tuning sample stays in-band for MinSamplesForLock)
-adpll_controller_bangbang.sv          controller: bang-bang PI loop filter (1-bit/sign error)
-adpll_controller_linear.sv   controller: linear PI loop filter (multi-bit error, power-of-two gains)
+adpll_freq_counter.sv   shared: Gray-CDC DCO-edge counter over a runtime-length measurement window
+adpll_lock_detect.sv    shared: lock detector (tuning sample stays in-band for MinSamplesForLock)
+adpll_tdc.sv            shared (phase loop): time-to-digital converter -- sub-cycle DCO phase
+controller/
+  adpll_controller_bangbang.sv    bang-bang PI loop filter (1-bit/sign frequency error)
+  adpll_controller_linear.sv      linear PI loop filter (multi-bit error, power-of-two gains)
+  adpll_controller_gearshift.sv   adaptive-step bang-bang (binary-search acquisition; Da Dalt)
+  adpll_controller_phase.sv       phase-domain type-II PI (TDC + phase accumulators) -- true phase lock
 dco/
-  ring_dco_binary.sv              DCO: binary-weighted delay-select ring (the default)
-  ring_dco_thermometer.sv  DCO: unit-weighted (thermometer) ring, monotonic by construction
-  ring_dco_muxtap.sv       DCO: variable-length ring (tap mux tree)
-  gen_ring_dco_spice.py    emit a SPICE deck for a ring DCO and sweep tune codes in ngspice
+  ring_dco_binary.sv        binary-weighted delay-select ring (the default)
+  ring_dco_thermometer.sv   unit-weighted (thermometer) ring, monotonic by construction
+  ring_dco_muxtap.sv        variable-length ring (tap mux tree)
+  ring_dco_coarsefine.sv    two-bank coarse + fine ring (wide range + fine resolution)
+  gen_ring_dco_spice.py     emit a SPICE deck for a ring DCO and sweep tune codes in ngspice
 ```
 
-A controller (`adpll_controller_bangbang*`) + a DCO (`ring_dco_binary*`) form a loop; the two shared blocks are
-common to every controller. All variants share the same port interfaces, so they are
-drop-in swappable.
+A controller + a DCO form a loop; the shared blocks are common to every controller. All
+controllers share one port interface and all DCOs share another, so they are drop-in swappable
+(3 frequency-locked controllers × 4 DCOs = the 12-variant matrix). The **bang-bang**, **linear**,
+and **gear-shift** controllers are FLLs (they lock average frequency via the edge counter); the
+**phase** controller is a true PLL — it adds the TDC and reference/variable phase accumulators to
+null *phase*, not just frequency.
 
 ## Sim/synth views (one macro: `SYNTHESIS`)
 
@@ -49,10 +57,15 @@ DCO in SPICE, not in STA.
 
 ```sh
 make sim-adpll          # iverilog: DCO oscillates + the loop locks (behavioural DCO)
-make sim-adpll-survey   # compare the controller variants (lock time + settled code)
+make sim-adpll-survey   # compare the FLL controller variants (bang-bang/linear/gearshift)
+make sim-adpll-matrix   # all 12 FLL variants (3 controllers x 4 DCOs): lock time + settled tune
+make sim-adpll-phase    # phase-domain ADPLL (TDC + phase accumulators): true phase lock
 make dco-spice          # ngspice freq-vs-code at the typical corner
 make dco-spice-corners  # ngspice freq-vs-code across SS/TT/FF PVT corners (run regularly)
 ```
+
+`gen_ring_dco_spice.py --topology {binary,thermometer,muxtap,coarsefine}` emits the SPICE deck
+for any DCO variant (coarse/fine also takes `--fine-bits`).
 
 ngspice **>= 42** is required for the gf180 BSIM4 models (the system ngspice-34 rejects
 `mulu0` etc.); override with `make dco-spice NGSPICE=/path/to/ngspice`.

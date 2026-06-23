@@ -19,6 +19,8 @@ are intentionally excluded.
   damping/phase-margin background).
 - **[DaDalt2004]** J. Lee, K. S. Kundert, B. Razavi, "Analysis and modeling of bang-bang
   clock and data recovery circuits," *IEEE JSSC*, vol. 39, no. 9, 2004 ([Kratyuk2007] ref [12]).
+- **[DaDalt2005]** N. Da Dalt, "A design-oriented study of the nonlinear dynamics of digital
+  bang-bang PLLs," *IEEE TCAS-I*, vol. 52, no. 1, pp. 21–31, 2005 (gear shifting).
 
 ## Architecture
 
@@ -47,12 +49,13 @@ temperature (PVT) variations."* A second-order (type-II) loop suffices: [Kratyuk
 
 | module | role |
 |---|---|
-| `adpll_freq_counter` | Gray-coded DCO-edge counter sampled over a runtime `div_i`-cycle window; frequency-to-digital front end. Shared by all controllers. |
-| `adpll_lock_detect` | declares lock when the watched control code holds a ±`Band` window for `LockWindows` samples. Shared. |
+| `adpll_freq_counter` | Gray-coded DCO-edge counter over a runtime-length measurement window; frequency-to-digital front end. Shared by all controllers. |
+| `adpll_lock_detect` | declares lock when the watched control code holds within ±`BandRadius` for `MinSamplesForLock` consecutive samples. Shared. |
+| `adpll_tdc` | time-to-digital converter: sub-cycle DCO phase at the reference edge (flash `dlybuff` delay line in synthesis / behavioural `$realtime` model in sim). Used only by the phase-domain controller. |
 
 ## DCO variants (interface `enable_i`, `tune_i[NumTuneBits-1:0]`, `clk_o`)
 
-All three are ring oscillators (one NAND gate gives the single inversion; `enable_i` gates
+All four are ring oscillators (one NAND gate gives the single inversion; `enable_i` gates
 it), built from `nand2`/`inv`/`mux2` cells with `keep`/`dont_touch`. A ring is used over an
 LC DCO because LC needs an inductor + MOS varactors ([Staszewski2006] §2.1–2.3) — not
 standard cells; the accepted cost is phase noise: ring synthesizers *"are all based on a ring
@@ -67,17 +70,23 @@ current DAC.
 | `ring_dco_binary` | binary-weighted delay select (segment i = 2^i pairs, N muxes) | smallest (N muxes); binary weighting can be non-monotonic at major carries |
 | `ring_dco_thermometer` | unit-weighted (thermometer) delay select, 2^N identical stages | monotonic by construction; mismatch can be averaged with DEM [Staszewski2006 §3.5]; costs 2^N cells |
 | `ring_dco_muxtap` | variable ring **length** via a 2^N:1 tap mux tree (Kajiwara–Nakagawa style) | re-routes feedback instead of inserting delay; fixed mux-tree delay floor |
+| `ring_dco_coarsefine` | two banks: a thermometer **coarse** bank (unit = 2^FineBits pairs) + a thermometer **fine** bank (unit = 1 pair) — Staszewski normalized DCO [Staszewski2006 §5] | wide range + fine resolution from few units; coarse/fine mismatch is the DNL term to watch |
 
-## Controller variants (interface `clk_i,rst_ni,enable_i,mul_i,div_i,dco_clk_i → tune_o,lock_o`)
+## Controller variants
 
-Both reuse `adpll_freq_counter` + `adpll_lock_detect`; only the loop filter differs. Both are
-proportional-integral (PI): [Kratyuk2007 §IV-C] *"A digital equivalent of an analog loop
-filter consists of a proportional path with a gain α and an integral path with a gain β."*
+The first three are **frequency-locked** loops sharing one interface
+(`clk_i,rst_ni,enable_i,mul_i,div_i,dco_clk_i → tune_o,lock_o`); they reuse `adpll_freq_counter`
++ `adpll_lock_detect` and differ only in the loop filter. The fourth is a true **phase-locked**
+loop with a different front end (a TDC + phase accumulators). All are proportional-integral (PI):
+[Kratyuk2007 §IV-C] *"A digital equivalent of an analog loop filter consists of a proportional
+path with a gain α and an integral path with a gain β."*
 
-| module | loop filter | source |
+| module | loop / filter | source |
 |---|---|---|
-| `adpll_controller_bangbang` | **bang-bang** PI: 1-bit (sign) error, integer gains | [Hanumolu2007 §IV-A] *"A DFF simply detects the sign of the phase error and hence serves as a 1-bit TDC"*; bang-bang dynamics [DaDalt2004] |
-| `adpll_controller_linear` | **linear** PI: multi-bit error, power-of-two α/β shifts, anti-windup | full [Kratyuk2007] procedure; gains quantized to powers of two ([Kratyuk2007 §V] *"α ≈ 2⁻³, β ≈ 2⁻⁷"*) |
+| `adpll_controller_bangbang` | FLL, **bang-bang** PI: 1-bit (sign) error, integer gains | [Hanumolu2007 §IV-A] *"A DFF simply detects the sign of the phase error and hence serves as a 1-bit TDC"*; bang-bang dynamics [DaDalt2004] |
+| `adpll_controller_linear` | FLL, **linear** PI: multi-bit error, power-of-two α/β shifts, anti-windup | full [Kratyuk2007] procedure; gains quantized to powers of two ([Kratyuk2007 §V] *"α ≈ 2⁻³, β ≈ 2⁻⁷"*) |
+| `adpll_controller_gearshift` | FLL, **adaptive-step** bang-bang: step `1<<gear`, downshift a gear on each error-sign reversal | gear shifting [DaDalt2005 §V]; a coarse binary search that auto-refines to a ±1 LSB limit cycle (fast lock, no Kp/Ki tuning) |
+| `adpll_controller_phase` | **PLL**, type-II PI on the phase error (reference/variable phase accumulators + `adpll_tdc`); interface uses `fcw_i,tdc_frac_i` instead of `mul_i/div_i` | phase-domain ADPLL [Staszewski2006 §4–5]; type-II PI [Kratyuk2007] — nulls *phase*, not just average frequency |
 
 ## Results
 
@@ -87,6 +96,12 @@ filter consists of a proportional path with a gain α and an integral path with 
 |---|---|---|---|
 | bang-bang PI | 21 | 7938 | no gain matching; clean ±1 LSB limit cycle |
 | linear PI | 20 | 4610 | faster + exact, **but** required a tiny proportional gain (`AlphaShift=10`) — a larger α slams tune to a rail and oscillates rail-to-rail on a coarse DCO (huge cold-start error) |
+| gear-shift | 20 | 4610 | binary-search acquisition (step halves on each sign reversal); as fast as linear PI with **no** Kp/Ki tuning |
+
+All three FLL controllers pass against all four DCOs — `make sim-adpll-matrix` (3 × 4 = 12 variants,
+bang-bang settles tune 21, linear/gearshift tune 20). The phase-domain PLL is measured separately
+(`make sim-adpll-phase`, fcw=427=6.667·2⁶, AlphaShift=6/BetaShift=11): it **phase**-locks tune≈21 in
+**42 ref-cycles** and holds steady-state tune in [18,22] about the ideal 20.
 
 ![Controller acquisition trajectory](figures/ctrl_trajectory.png)
 
@@ -134,3 +149,20 @@ Findings (confirming the textbook):
 
 Corner sims are run regularly via `make dco-spice-corners` as the design evolves; the figures
 are regenerated with `src/adpll/dco/plot_pll.py`.
+
+### Coarse/fine DCO in SPICE — `gen_ring_dco_spice.py --topology coarsefine`
+
+The two-bank DCO is SPICE-characterizable like the rest. Typical-corner sweep (7-bit,
+`--fine-bits 3`):
+
+| code | freq (TT) |
+|---|---|
+| 0   | 110.5 MHz |
+| 32  | 71.6 MHz |
+| 64  | 53.0 MHz |
+
+Monotonic, as designed. The absolute frequency is lower than the single-bank rings (binary code 0
+= 338 MHz) because **both** bank muxes always sit in the base ring path (15 coarse + 7 fine muxes
+even at code 0, vs 7 for binary) — the resolution/range split costs a higher fixed delay floor.
+The extraction is slower per code than the single-bank rings (the coarse bank instantiates
+2^FineBits inverter pairs per unit), so sweep a few codes rather than the full range.

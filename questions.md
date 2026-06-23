@@ -8,6 +8,41 @@ PCB action items (for you, not RTL-blocking) live in `docs/hardware-notes.md`.
 
 New questions will be added here if I hit a genuine fork while you're away.
 
+## Autonomous ADPLL-variants session (2026-06-22, you away for hours)
+
+Building the three ADPLL variants discussed:
+1. **gear-shift controller** — DONE (83ab2f4); 9-variant matrix passes, locks tune=20 in 4610 cyc.
+2. **coarse/fine DCO** — DONE (ae20db5); 12-variant matrix passes.
+3. **TDC + phase-domain ADPLL** — IN PROGRESS.
+Plus: SPICE for the new DCO; style + docs/style.md compliance; grounded in reference/adpll.
+
+SPICE env confirmed (ngspice-45 @ nix path; binary DCO sweeps monotonic 338->235 MHz).
+All work stays LOCAL (no push). Decisions taken autonomously are logged below; none blocking yet.
+
+### Decisions taken (flag at review if any should change)
+All three variants built, validated (behavioural lock + yosys elaboration), committed locally:
+- **gear-shift** (`adpll_controller_gearshift`, 83ab2f4): step `1<<gear`, downshift on each
+  error-sign reversal; `MaxGear` default `NumTuneBits-2`. Locks tune=20 in 4610 cyc.
+- **coarse/fine DCO** (`ring_dco_coarsefine`, ae20db5): `NumFineBits` default 3 (4 coarse + 3 fine
+  for 7-bit); coarse unit = 2^FineBits pairs so the banks splice monotonically. SPICE (0fdf91c)
+  monotonic (TT: code 0=110.5, 32=71.6, 64=53.0 MHz) — lower than single-bank rings because both
+  bank muxes sit in the base ring path.
+- **TDC + phase-domain ADPLL** (`adpll_tdc` + `adpll_controller_phase`, 3feb5c7): true phase lock.
+  TDC `FracBits` default 6 (63-tap flash `dlybuff` line in synth / `$realtime` model in sim).
+  Phase PI gains `AlphaShift=6`/`BetaShift=11` tuned in sim; `MinSamplesForLock=8`/`BandRadius=2`.
+  Interface uses `fcw_i` (Q.FracBits) + `tdc_frac_i` instead of `mul_i`/`div_i`. Locks tune=21 in
+  42 cyc, holds [18,22] about 20. Added `make sim-adpll-phase`.
+
+### Open follow-ups (not blocking)
+- **Structural TDC normalization**: the synthesizable flash TDC outputs a raw delay-line count;
+  a silicon build needs back-annotated cell delays (SDF/SPICE) and the line sized so 2^FracBits-1
+  taps span one DCO period. A true Staszewski TDC also measures the period and divides to
+  normalize — left as a follow-up (noted inline in adpll_tdc.sv). The behavioural model (used by
+  sim) already gives the normalized fraction, so the loop is validated end-to-end in sim.
+- **Phase ADPLL not yet integrated into chip_core / CSR** (the FLL bang-bang is the in-chip one).
+  The phase loop + TDC are standalone-validated; wiring a phase variant into the chip + a SPICE
+  freq-vs-code correlation for the TDC delay line would be the next step if you want it on silicon.
+
 ## RESOLVED (2026-06-21): yosys-slang lfsr crash — root-caused + fixed cleanly
 
 The `Assertion 'location' failed` crash on verilog-ethernet's `lfsr` is **root-caused and

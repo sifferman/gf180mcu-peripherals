@@ -80,12 +80,30 @@ VERILOG_FILES:
 - dir::../third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi_core.v
 - dir::../third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi_pmem.v
 - dir::../src/sdram/sdram_wrap.sv
-# ADPLL (CSR + bang-bang controller + ring DCO; observe-only, DCO preserved via (* keep *)/dont_touch)
-- dir::../src/csr/adpll_csr.sv
+# ADPLL array: 12 controller x DCO macros + CSR (observe-only; DCOs preserved via (* keep *)/dont_touch)
+- dir::../src/csr/adpll_array_csr.sv
+- dir::../src/adpll/adpll_array.sv
 - dir::../src/adpll/adpll_freq_counter.sv
 - dir::../src/adpll/adpll_lock_detect.sv
 - dir::../src/adpll/controller/adpll_controller_bangbang.sv
+- dir::../src/adpll/controller/adpll_controller_linear.sv
+- dir::../src/adpll/controller/adpll_controller_gearshift.sv
 - dir::../src/adpll/dco/ring_dco_binary.sv
+- dir::../src/adpll/dco/ring_dco_thermometer.sv
+- dir::../src/adpll/dco/ring_dco_muxtap.sv
+- dir::../src/adpll/dco/ring_dco_coarsefine.sv
+- dir::../src/adpll/macros/adpll_bangbang_binary.sv
+- dir::../src/adpll/macros/adpll_bangbang_thermometer.sv
+- dir::../src/adpll/macros/adpll_bangbang_muxtap.sv
+- dir::../src/adpll/macros/adpll_bangbang_coarsefine.sv
+- dir::../src/adpll/macros/adpll_linear_binary.sv
+- dir::../src/adpll/macros/adpll_linear_thermometer.sv
+- dir::../src/adpll/macros/adpll_linear_muxtap.sv
+- dir::../src/adpll/macros/adpll_linear_coarsefine.sv
+- dir::../src/adpll/macros/adpll_gearshift_binary.sv
+- dir::../src/adpll/macros/adpll_gearshift_thermometer.sv
+- dir::../src/adpll/macros/adpll_gearshift_muxtap.sv
+- dir::../src/adpll/macros/adpll_gearshift_coarsefine.sv
 # Top + core
 - dir::../src/chip_core.sv
 - dir::../src/chip_top.sv

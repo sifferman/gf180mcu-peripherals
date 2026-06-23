@@ -283,11 +283,21 @@ def chip_top_runner():
         sources.append(PROJ / "../src/axi/axil_to_axi4.sv")
         sources.append(PROJ / "../src/axi/axil_interconnect.sv")
         sources.append(PROJ / "../src/sdram/sdram_wrap.sv")
-        sources.append(PROJ / "../src/csr/adpll_csr.sv")
+        # ADPLL array: CSR + 12 controller x DCO macros + shared blocks
+        sources.append(PROJ / "../src/csr/adpll_array_csr.sv")
+        sources.append(PROJ / "../src/adpll/adpll_array.sv")
         sources.append(PROJ / "../src/adpll/adpll_freq_counter.sv")
         sources.append(PROJ / "../src/adpll/adpll_lock_detect.sv")
         sources.append(PROJ / "../src/adpll/controller/adpll_controller_bangbang.sv")
+        sources.append(PROJ / "../src/adpll/controller/adpll_controller_linear.sv")
+        sources.append(PROJ / "../src/adpll/controller/adpll_controller_gearshift.sv")
         sources.append(PROJ / "../src/adpll/dco/ring_dco_binary.sv")
+        sources.append(PROJ / "../src/adpll/dco/ring_dco_thermometer.sv")
+        sources.append(PROJ / "../src/adpll/dco/ring_dco_muxtap.sv")
+        sources.append(PROJ / "../src/adpll/dco/ring_dco_coarsefine.sv")
+        import glob as _glob
+        for _m in sorted(_glob.glob(str(PROJ / "../src/adpll/macros/adpll_*.sv"))):
+            sources.append(Path(_m))
         _sdc = PROJ / "../third_party/ultraembedded_axi_sdram_controller/src_v"
         sources += [_sdc / "sdram_axi.v", _sdc / "sdram_axi_core.v", _sdc / "sdram_axi_pmem.v"]
         # verilog-ethernet: only modules reachable from chip_top

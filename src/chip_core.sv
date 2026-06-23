@@ -352,19 +352,19 @@ sdram_wrap i_sdram (
     .sdram_dq_i  (sdram_dq_in)
 );
 
-// On-chip ADPLL (observe-only). CSR at 0x2000_0000 sets enable/mul/div over Ethernet; the
-// bang-bang controller tunes a ring DCO so F_DCO = (mul/div)*clk. The DCO clock and lock are
-// routed to the two analog observation pads. It does NOT clock the core.
-wire        pll_enable;
-wire [23:0] pll_mul;
-wire [15:0] pll_div;
-wire        pll_lock;
-wire [6:0]  pll_tune;
-wire        pll_dco_clk;
+// On-chip ADPLL array (observe-only): 12 controller x DCO macros (adpll_array), each programmed
+// independently over Ethernet through adpll_array_csr at 0x2000_0000 (enable/mul/div) and read
+// back (lock/tune). It does NOT clock the core. Observability at the chip level is the per-PLL
+// CSR STATUS over Ethernet: the gf180 analog pads (asig_5p0) cannot carry routed digital signals
+// (driving a DCO clock onto them leaves the internal sink open -> LVS), so the CSR-selected
+// observation mux (obs_dco_clk/obs_lock) is not brought to a pad. The 12 ring DCOs survive
+// synthesis via (* keep *)/(* dont_touch *) inside each macro.
+wire obs_dco_clk;
+wire obs_lock;
 
-adpll_csr #(
+adpll_array #(
     .NumTuneBits(7)
-) i_pll_csr (
+) i_pll_array (
     .clk_i (clk),
     .rst_ni(rst_n),
     .s_axil_awaddr (csr_axil_awaddr),
@@ -386,38 +386,9 @@ adpll_csr #(
     .s_axil_rresp  (csr_axil_rresp),
     .s_axil_rvalid (csr_axil_rvalid),
     .s_axil_rready (csr_axil_rready),
-    .enable_o(pll_enable),
-    .mul_o   (pll_mul),
-    .div_o   (pll_div),
-    .lock_i  (pll_lock),
-    .tune_i  (pll_tune)
+    .obs_dco_clk_o (obs_dco_clk),
+    .obs_lock_o    (obs_lock)
 );
-
-adpll_controller_bangbang #(
-    .NumTuneBits(7)
-) i_pll_ctrl (
-    .clk_i    (clk),
-    .rst_ni   (rst_n),
-    .enable_i (pll_enable),
-    .mul_i    (pll_mul),
-    .div_i    (pll_div),
-    .dco_clk_i(pll_dco_clk),
-    .tune_o   (pll_tune),
-    .lock_o   (pll_lock)
-);
-
-ring_dco_binary #(
-    .NumTuneBits(7)
-) i_pll_dco (
-    .enable_i(pll_enable),
-    .tune_i  (pll_tune),
-    .clk_o   (pll_dco_clk)
-);
-
-// PLL observability is via the CSR STATUS register (lock + tune, read over Ethernet), not the
-// analog pads: the gf180 analog pads (asig_5p0) are not routed to internal digital logic by the
-// flow, so driving the DCO clock / lock onto them leaves the internal sinks open (LVS opens).
-// Leave the analog pads undriven; pll_dco_clk stays a normal internal net routed to the counter.
 
 // Bidir pad outputs (see pad map above)
 assign bidir_out[0]     = rmii_tx_en;
@@ -453,7 +424,8 @@ assign input_pd = '0;
 
 logic _unused;
 assign _unused = &{1'b0, led[7:4], input_in[NUM_INPUT_PADS-1:4],
-                   bidir_in[7:0], bidir_in[NUM_BIDIR_PADS-1:24], analog};
+                   bidir_in[7:0], bidir_in[NUM_BIDIR_PADS-1:24], analog,
+                   obs_dco_clk, obs_lock};
 
 endmodule
 

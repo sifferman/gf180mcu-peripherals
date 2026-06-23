@@ -166,3 +166,14 @@ Monotonic, as designed. The absolute frequency is lower than the single-bank rin
 even at code 0, vs 7 for binary) — the resolution/range split costs a higher fixed delay floor.
 The extraction is slower per code than the single-bank rings (the coarse bank instantiates
 2^FineBits inverter pairs per unit), so sweep a few codes rather than the full range.
+
+## On-chip: the 12-PLL array
+
+All 12 FLL macros (3 controllers × 4 DCOs) ship in `chip_core` as `adpll_array`, each wired to
+`adpll_array_csr` (AXI4-Lite at `0x2000_0000`): a host programs every PLL independently over
+Ethernet (PLL `i` = four words at byte offset `i*0x10`: `CTRL`/`MUL`/`DIV`/`STATUS`) and a global
+`OBS_SEL` (`0xC0`) picks which PLL's clock+lock drive the observation mux. The 12 PLLs add **zero
+pads** — control rides the existing Ethernet→AXI→CSR path and observability is the per-PLL
+`STATUS` (lock+tune); the muxed observation is not pad-routed (analog pads can't carry routed
+digital, and the padring is full). `make sim-adpll-array` programs all 12 over the CSR and confirms
+each locks (bang-bang 21, linear/gearshift 20) plus the mux tracks the selection.

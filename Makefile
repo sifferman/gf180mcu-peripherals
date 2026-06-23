@@ -165,6 +165,19 @@ sim-adpll-csr: ## Integrated ADPLL: program mul/div/enable over AXI4-Lite CSR, p
 	vvp cocotb/sim_build/tb_adpll_csr | grep -E "CSR programmed|LOCKED|PASS|FAIL"
 .PHONY: sim-adpll-csr
 
+sim-adpll-array: ## CSR framework: program all 12 PLLs over AXI4-Lite, poll each for lock, test obs mux
+	@mkdir -p cocotb/sim_build
+	iverilog -g2012 -o cocotb/sim_build/tb_adpll_array $(ADPLL_TS) \
+		src/csr/adpll_array_csr.sv src/adpll/adpll_array.sv src/adpll/macros/adpll_*.sv \
+		src/adpll/controller/adpll_controller_bangbang.sv src/adpll/controller/adpll_controller_linear.sv \
+		src/adpll/controller/adpll_controller_gearshift.sv \
+		src/adpll/adpll_freq_counter.sv src/adpll/adpll_lock_detect.sv \
+		src/adpll/dco/ring_dco_binary.sv src/adpll/dco/ring_dco_thermometer.sv \
+		src/adpll/dco/ring_dco_muxtap.sv src/adpll/dco/ring_dco_coarsefine.sv \
+		cocotb/models/tb_adpll_array.v
+	vvp cocotb/sim_build/tb_adpll_array | grep -E "programmed|LOCKED|PASS|FAIL|obs mux"
+.PHONY: sim-adpll-array
+
 sim-adpll-survey: ## Compare the ADPLL controller variants (bang-bang / linear / gearshift PI): lock time + code
 	@mkdir -p cocotb/sim_build
 	@for ctrl in "bang-bang:" "linear:-DCTRL_LINEAR" "gearshift:-DCTRL_GEARSHIFT"; do \

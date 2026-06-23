@@ -82,7 +82,7 @@ VERILOG_FILES:
 - dir::../src/sdram/sdram_wrap.sv
 # ADPLL array: 12 controller x DCO macros + CSR (observe-only; DCOs preserved via (* keep *)/dont_touch)
 - dir::../src/csr/adpll_array_csr.sv
-- dir::../src/adpll/adpll_array.sv
+- dir::../src/adpll_array.sv
 - dir::../src/adpll/adpll_freq_counter.sv
 - dir::../src/adpll/adpll_lock_detect.sv
 - dir::../src/adpll/controller/adpll_controller_bangbang.sv

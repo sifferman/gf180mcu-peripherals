@@ -285,7 +285,7 @@ def chip_top_runner():
         sources.append(PROJ / "../src/sdram/sdram_wrap.sv")
         # ADPLL array: CSR + 12 controller x DCO macros + shared blocks
         sources.append(PROJ / "../src/csr/adpll_array_csr.sv")
-        sources.append(PROJ / "../src/adpll/adpll_array.sv")
+        sources.append(PROJ / "../src/adpll_array.sv")
         sources.append(PROJ / "../src/adpll/adpll_freq_counter.sv")
         sources.append(PROJ / "../src/adpll/adpll_lock_detect.sv")
         sources.append(PROJ / "../src/adpll/controller/adpll_controller_bangbang.sv")

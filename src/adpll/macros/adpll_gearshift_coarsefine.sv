@@ -27,35 +27,32 @@
 // adpll_gearshift_coarsefine
 //
 // Ref: Da Dalt TCAS-I 2005 (gear shifting); Staszewski Wiley 2006 Ch.5 (coarse/fine). See the controller / DCO files for detail.
-// Hardened-macro wrapper for one fixed ADPLL config = gearshift controller + coarsefine DCO. A macro
-// is a frozen block, so each controller x DCO combination is its own DESIGN_NAME; this is
-// the gearshift x coarsefine variant, presented to the chip as a black box.
+// Hardened-macro wrapper for one FIXED ADPLL config = gearshift controller + coarsefine DCO. A macro is a
+// frozen GDS block, so it has NO parameters: the configuration (7-bit tune code, 24-bit edge count,
+// 16-bit window) is fixed here and passed to the controller/DCO. Each controller x DCO combination
+// is its own DESIGN_NAME, presented to the chip as a black box.
 //
-// Parameters:
-//   - NumTuneBits, MaxEdgesPerWindow, MaxWindowSize : passed through to the controller
 // Ports:
 //   - clk_i, rst_ni, enable_i : run + program
 //   - mul_i, div_i  : synthesizer ratio N / M (set over the CSR)
 //   - lock_o, tune_o : status
 //   - dco_clk_o     : raw DCO clock, brought out for observation
 
-module adpll_gearshift_coarsefine #(
-    parameter int unsigned NumTuneBits = 7,
-    parameter  int unsigned MaxEdgesPerWindow = (1 << 24) - 1,
-    localparam int unsigned EdgeCountWidth    = $clog2(MaxEdgesPerWindow + 1),
-    parameter  int unsigned MaxWindowSize     = (1 << 16) - 1,
-    localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1)
-) (
-    input  wire                   clk_i,
-    input  wire                   rst_ni,
-    input  wire                   enable_i,
-    input  wire [EdgeCountWidth-1:0]  mul_i,
-    input  wire [WindowSizeWidth-1:0]    div_i,
+module adpll_gearshift_coarsefine (
+    input  wire        clk_i,
+    input  wire        rst_ni,
+    input  wire        enable_i,
+    input  wire [23:0] mul_i,       // EdgeCountWidth  = 24 = $clog2(MaxEdgesPerWindow+1)
+    input  wire [15:0] div_i,       // WindowSizeWidth = 16 = $clog2(MaxWindowSize+1)
 
-    output wire                   lock_o,
-    output wire [NumTuneBits-1:0] tune_o,
-    output wire                   dco_clk_o   // raw DCO oscillation, for observation
+    output wire        lock_o,
+    output wire [6:0]  tune_o,      // NumTuneBits = 7
+    output wire        dco_clk_o    // raw DCO oscillation, for observation
 );
+
+localparam int unsigned NumTuneBits       = 7;
+localparam int unsigned MaxEdgesPerWindow = (1 << 24) - 1;
+localparam int unsigned MaxWindowSize     = (1 << 16) - 1;
 
 wire [NumTuneBits-1:0] tune;
 wire                   dco_clk;

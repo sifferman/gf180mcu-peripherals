@@ -168,7 +168,7 @@ sim-adpll-csr: ## Integrated ADPLL: program mul/div/enable over AXI4-Lite CSR, p
 sim-adpll-array: ## CSR framework: program all 12 PLLs over AXI4-Lite, poll each for lock, test obs mux
 	@mkdir -p cocotb/sim_build
 	iverilog -g2012 -o cocotb/sim_build/tb_adpll_array $(ADPLL_TS) \
-		src/csr/adpll_array_csr.sv src/adpll/adpll_array.sv src/adpll/macros/adpll_*.sv \
+		src/csr/adpll_array_csr.sv src/adpll_array.sv src/adpll/macros/adpll_*.sv \
 		src/adpll/controller/adpll_controller_bangbang.sv src/adpll/controller/adpll_controller_linear.sv \
 		src/adpll/controller/adpll_controller_gearshift.sv \
 		src/adpll/adpll_freq_counter.sv src/adpll/adpll_lock_detect.sv \

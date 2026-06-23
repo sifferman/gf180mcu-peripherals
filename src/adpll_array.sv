@@ -29,10 +29,11 @@
 // once and wired to adpll_array_csr, so a host programs each PLL independently over Ethernet
 // (enable/mul/div) and reads its lock/tune. A CSR-selected observation mux routes one PLL's DCO
 // clock + lock to the shared observation outputs (the chip has far fewer pads than 12 PLLs, so
-// observation is multiplexed -- every PLL still runs and is read back over the CSR).
+// observation is multiplexed -- every PLL still runs and is read back over the CSR). The macros are
+// frozen blocks with no parameters; this wrapper's widths (defaults) match their fixed 7/24/16 config.
 //
 // Parameters:
-//   - NumTuneBits, MaxEdgesPerWindow, MaxWindowSize : PLL widths (shared by all macros + the CSR)
+//   - NumTuneBits, MaxEdgesPerWindow, MaxWindowSize : widths shared by the CSR (must match the macros)
 // Ports: AXI4-Lite slave (PLL control/status over the fabric) + obs_dco_clk_o / obs_lock_o
 
 module adpll_array #(
@@ -116,11 +117,7 @@ adpll_array_csr #(
     .obs_sel_o(obs_sel)
 );
 
-adpll_bangbang_binary #(
-    .NumTuneBits(NumTuneBits),
-    .MaxEdgesPerWindow(MaxEdgesPerWindow),
-    .MaxWindowSize(MaxWindowSize)
-) adpll_bangbang_binary (
+adpll_bangbang_binary adpll_bangbang_binary (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[0]),
@@ -131,11 +128,7 @@ adpll_bangbang_binary #(
     .dco_clk_o(pll_dco_clk[0])
 );
 
-adpll_bangbang_thermometer #(
-    .NumTuneBits(NumTuneBits),
-    .MaxEdgesPerWindow(MaxEdgesPerWindow),
-    .MaxWindowSize(MaxWindowSize)
-) adpll_bangbang_thermometer (
+adpll_bangbang_thermometer adpll_bangbang_thermometer (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[1]),
@@ -146,11 +139,7 @@ adpll_bangbang_thermometer #(
     .dco_clk_o(pll_dco_clk[1])
 );
 
-adpll_bangbang_muxtap #(
-    .NumTuneBits(NumTuneBits),
-    .MaxEdgesPerWindow(MaxEdgesPerWindow),
-    .MaxWindowSize(MaxWindowSize)
-) adpll_bangbang_muxtap (
+adpll_bangbang_muxtap adpll_bangbang_muxtap (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[2]),
@@ -161,11 +150,7 @@ adpll_bangbang_muxtap #(
     .dco_clk_o(pll_dco_clk[2])
 );
 
-adpll_bangbang_coarsefine #(
-    .NumTuneBits(NumTuneBits),
-    .MaxEdgesPerWindow(MaxEdgesPerWindow),
-    .MaxWindowSize(MaxWindowSize)
-) adpll_bangbang_coarsefine (
+adpll_bangbang_coarsefine adpll_bangbang_coarsefine (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[3]),
@@ -176,11 +161,7 @@ adpll_bangbang_coarsefine #(
     .dco_clk_o(pll_dco_clk[3])
 );
 
-adpll_linear_binary #(
-    .NumTuneBits(NumTuneBits),
-    .MaxEdgesPerWindow(MaxEdgesPerWindow),
-    .MaxWindowSize(MaxWindowSize)
-) adpll_linear_binary (
+adpll_linear_binary adpll_linear_binary (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[4]),
@@ -191,11 +172,7 @@ adpll_linear_binary #(
     .dco_clk_o(pll_dco_clk[4])
 );
 
-adpll_linear_thermometer #(
-    .NumTuneBits(NumTuneBits),
-    .MaxEdgesPerWindow(MaxEdgesPerWindow),
-    .MaxWindowSize(MaxWindowSize)
-) adpll_linear_thermometer (
+adpll_linear_thermometer adpll_linear_thermometer (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[5]),
@@ -206,11 +183,7 @@ adpll_linear_thermometer #(
     .dco_clk_o(pll_dco_clk[5])
 );
 
-adpll_linear_muxtap #(
-    .NumTuneBits(NumTuneBits),
-    .MaxEdgesPerWindow(MaxEdgesPerWindow),
-    .MaxWindowSize(MaxWindowSize)
-) adpll_linear_muxtap (
+adpll_linear_muxtap adpll_linear_muxtap (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[6]),
@@ -221,11 +194,7 @@ adpll_linear_muxtap #(
     .dco_clk_o(pll_dco_clk[6])
 );
 
-adpll_linear_coarsefine #(
-    .NumTuneBits(NumTuneBits),
-    .MaxEdgesPerWindow(MaxEdgesPerWindow),
-    .MaxWindowSize(MaxWindowSize)
-) adpll_linear_coarsefine (
+adpll_linear_coarsefine adpll_linear_coarsefine (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[7]),
@@ -236,11 +205,7 @@ adpll_linear_coarsefine #(
     .dco_clk_o(pll_dco_clk[7])
 );
 
-adpll_gearshift_binary #(
-    .NumTuneBits(NumTuneBits),
-    .MaxEdgesPerWindow(MaxEdgesPerWindow),
-    .MaxWindowSize(MaxWindowSize)
-) adpll_gearshift_binary (
+adpll_gearshift_binary adpll_gearshift_binary (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[8]),
@@ -251,11 +216,7 @@ adpll_gearshift_binary #(
     .dco_clk_o(pll_dco_clk[8])
 );
 
-adpll_gearshift_thermometer #(
-    .NumTuneBits(NumTuneBits),
-    .MaxEdgesPerWindow(MaxEdgesPerWindow),
-    .MaxWindowSize(MaxWindowSize)
-) adpll_gearshift_thermometer (
+adpll_gearshift_thermometer adpll_gearshift_thermometer (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[9]),
@@ -266,11 +227,7 @@ adpll_gearshift_thermometer #(
     .dco_clk_o(pll_dco_clk[9])
 );
 
-adpll_gearshift_muxtap #(
-    .NumTuneBits(NumTuneBits),
-    .MaxEdgesPerWindow(MaxEdgesPerWindow),
-    .MaxWindowSize(MaxWindowSize)
-) adpll_gearshift_muxtap (
+adpll_gearshift_muxtap adpll_gearshift_muxtap (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[10]),
@@ -281,11 +238,7 @@ adpll_gearshift_muxtap #(
     .dco_clk_o(pll_dco_clk[10])
 );
 
-adpll_gearshift_coarsefine #(
-    .NumTuneBits(NumTuneBits),
-    .MaxEdgesPerWindow(MaxEdgesPerWindow),
-    .MaxWindowSize(MaxWindowSize)
-) adpll_gearshift_coarsefine (
+adpll_gearshift_coarsefine adpll_gearshift_coarsefine (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[11]),

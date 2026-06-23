@@ -53,7 +53,7 @@ module adpll_tdc #(
 
 localparam int unsigned NumTaps = (1 << FracBits) - 1;
 
-`ifdef SYNTHESIS
+`ifndef SYNTHESIS
 
 // Flash TDC: the DCO edge propagates down a dlybuff delay line; the reference edge latches every
 // tap at once, so the count of taps the edge has reached = elapsed DCO time in delay-cell units.

@@ -167,6 +167,14 @@ CLOCK_PORT: clk_PAD
 CLOCK_NET: clk_pad/Y
 CLOCK_PERIOD: 40 # 25 MHz
 
+# CTS sink clustering. The 12-PLL array adds thousands of reference-domain flops, so the core
+# clock tree is large; OpenROAD's default sink clustering (~20 sinks per leaf buffer) drives each
+# clkbuf_leaf well past the tight MAX_FANOUT_CONSTRAINT of 9, which flagged ~2000 benign clock-tree
+# leaf max-fanout warnings (the data enable/reset nets meet 9 — repair_design buffers them). Cap
+# the leaf cluster at 8 sinks so the clock tree honours the same fanout budget as the data nets
+# (more, smaller clock buffers; the die has room at ~51% utilization).
+CTS_SINK_CLUSTERING_SIZE: 8
+
 # Overfix hold violations
 PL_RESIZER_HOLD_SLACK_MARGIN: 0.35
 GRT_RESIZER_HOLD_SLACK_MARGIN: 0.3

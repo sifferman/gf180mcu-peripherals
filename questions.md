@@ -19,7 +19,54 @@ Plus: SPICE for the new DCO; style + docs/style.md compliance; grounded in refer
 SPICE env confirmed (ngspice-45 @ nix path; binary DCO sweeps monotonic 338->235 MHz).
 All work stays LOCAL (no push). Decisions taken autonomously are logged below; none blocking yet.
 
-### Decisions taken (flag at review if any should change)
+## 12-PLL chip integration + full GDS (2026-06-23, overnight autonomous)
+
+Goal (your ask): full-chip GDS with all 12 PLLs as CSR-controlled macros + a CSR test framework.
+
+DONE (committed locally):
+- 6 new macro wrappers -> all 12 controller x DCO macros (47ab006).
+- `adpll_array_csr.sv` (NumPll-generic AXI4-Lite CSR) + `adpll_array.sv` (12 macros + obs mux).
+- chip_core: single PLL -> adpll_array. **PLL 0 = bangbang_binary keeps the old register
+  offsets**, so the existing chip_top_tb ADPLL-over-UDP test stays valid.
+- config.yaml + chip_top_tb.py source lists updated.
+- **CSR test framework** `make sim-adpll-array` (fb0779c): programs all 12 PLLs over AXI4-Lite,
+  polls each STATUS for lock, checks tune in range, exercises the obs mux. **PASS** — all 12 lock
+  (PLL0-3 bangbang 21, PLL4-7 linear 20, PLL8-11 gearshift 20), mux tracks selection.
+
+CSR map: base 0x2000_0000; PLL i at byte offset i*0x10 = {CTRL[0]=en, MUL, DIV, STATUS(lock+tune)};
+OBS_SEL at 0xC0 (which PLL's clk/lock drive the obs mux).
+
+### Decisions taken (autonomous; flag at review if any should change)
+- **12 = the 3 FLL controllers x 4 DCOs** (uniform mul/div/enable->lock/tune interface). The
+  phase-domain PLL is EXCLUDED (its fcw/tdc interface would break the uniform CSR) -- could be
+  added as a 13th with its own CSR if you want it on-chip.
+- **GDS via the single-run flat harden** (12 PLLs as preserved RTL hierarchy + per-DCO
+  (* keep *)/dont_touch), not 12 separate hardened GDS macros. The flat flow is the proven path
+  (M3 hardened with 1 PLL); 12 separate macro-GDS hardens + top placement overnight was too high
+  risk. True per-macro GDS hardening remains the more literal "as macros" reading -- logged as a
+  follow-up if you want it.
+- **Observation is CSR STATUS** (per-PLL lock+tune over Ethernet) + a CSR-selected obs mux that is
+  NOT brought to a pad: the gf180 analog pads can't carry routed digital (M3 LVS lesson), and the
+  padring has no spare digital pad. No padring change -- 12 PLLs add zero pins (CSR-controlled).
+
+### ENVIRONMENT FIX I made (outside the repo -- please be aware)
+The harden first failed: `--manual-pdk` looked for `$PDK_ROOT/gf180mcuD/...` but
+`/home/esifferm/Utils/ciel-pdks/gf180mcuD` was a STALE real dir (May 14, missing the ocd_io 5V
+pad libs) shadowing the correct versioned PDK. `ciel` refused to re-enable over it. I **moved it
+aside** (recoverable) to `/home/esifferm/Utils/ciel-pdks/gf180mcuD.stale-bak-20260623` and re-ran
+`ciel enable 019cf7a3... --include-libraries all`, which restored the proper symlink
+`gf180mcuD -> ciel/gf180mcu/versions/019cf7a3.../gf180mcuD`. Delete the `.stale-bak-*` dir if you
+don't want it. (This also means `make sim` needs PDK_ROOT pointing such that $PDK_ROOT/gf180mcuD
+resolves -- now fixed via the symlink.)
+
+### Harden status
+`make librelane` (full Chip flow to GDS) launched in the background after the PDK fix; synthesis
+passed (the ~192 "no driver"/"missing pin" lines are the known-benign verilog-ethernet PTP/unused
+ports, gated by ERROR_ON_SYNTH_CHECKS:false). Outcome (GDS / DRC / LVS / antenna) recorded here
+when it finishes; if a stage fails I iterate (likely area/density for 12 extra PLLs, or the 12
+ring-DCO combinational-loop domains).
+
+### (earlier variant decisions below)
 All three variants built, validated (behavioural lock + yosys elaboration), committed locally:
 - **gear-shift** (`adpll_controller_gearshift`, 83ab2f4): step `1<<gear`, downshift on each
   error-sign reversal; `MaxGear` default `NumTuneBits-2`. Locks tune=20 in 4610 cyc.

@@ -116,6 +116,9 @@ always_comb begin
     logic signed [PhaseWidth-1:0] integral_sum;
     logic signed [PhaseWidth+1:0] control_word;      // alpha*error + beta*integral
 
+    phase_error      = '0;   // default the temporaries so no latch is inferred (used only below)
+    integral_sum     = '0;
+    control_word     = '0;
     phase_advance    = PhaseWidth'($signed({1'b0, edges_this_cycle}) <<< FracBits) - PhaseWidth'(fcw_i);
     phase_detector_d = phase_detector_q;
     integral_d       = integral_q;

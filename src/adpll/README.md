@@ -60,6 +60,7 @@ make sim-adpll          # iverilog: DCO oscillates + the loop locks (behavioural
 make sim-adpll-survey   # compare the FLL controller variants (bang-bang/linear/gearshift)
 make sim-adpll-matrix   # all 12 FLL variants (3 controllers x 4 DCOs): lock time + settled tune
 make sim-adpll-phase    # phase-domain ADPLL (TDC + phase accumulators): true phase lock
+make sim-adpll-array    # CSR framework: program all 12 PLLs over AXI4-Lite, poll lock, test obs mux
 make dco-spice          # ngspice freq-vs-code at the typical corner
 make dco-spice-corners  # ngspice freq-vs-code across SS/TT/FF PVT corners (run regularly)
 ```
@@ -70,12 +71,20 @@ for any DCO variant (coarse/fine also takes `--fine-bits`).
 ngspice **>= 42** is required for the gf180 BSIM4 models (the system ngspice-34 rejects
 `mulu0` etc.); override with `make dco-spice NGSPICE=/path/to/ngspice`.
 
-## Integrating into chip_top (TODO — not yet wired in)
+## On the chip: the 12-PLL array
 
-- Drive `enable_i`/`mul_i`/`div_i` (and read `lock_o`) from a memory-mapped CSR.
-- Bring the DCO `clk_o` and `lock_o` to the two analog observation pads.
-- Preserve the ring in PnR: keep-hierarchy the DCO, `RSZ_DONT_TOUCH` the oscillator nets, and
-  extract its frequency in SPICE rather than trusting STA on the combinational loop.
-- Size for **all corners**: the ring's frequency swings ~2.4× across PVT, so a fixed target
-  is not universally reachable — the programmable `mul`/`div` picks a reachable ratio per
-  chip (see the corner data in `../../docs/adpll_survey.md`).
+All 12 FLL macros (3 controllers × 4 DCOs) are integrated into `chip_core` as `adpll_array`
+(`adpll_array.sv`), each wired to `adpll_array_csr` at `0x2000_0000`. A host programs every PLL
+independently over Ethernet and reads its lock/tune; PLL `i` occupies four 32-bit words at byte
+offset `i*0x10` (`CTRL`/`MUL`/`DIV`/`STATUS`), and `OBS_SEL` at `0xC0` picks which PLL's DCO clock
++ lock drive the observation mux. PLL 0 is `bangbang_binary` at the original single-PLL offsets.
+
+- **Control/observe over the CSR, no extra pads.** The 12 PLLs add zero pins — control rides the
+  Ethernet→AXI→CSR path and observability is the per-PLL `STATUS` (lock + tune). The CSR-selected
+  observation mux is *not* brought to a pad: the gf180 analog pads can't carry routed digital
+  (driving a DCO clock onto them opens the sink in LVS), and the padring has no spare digital pad.
+- **Rings preserved in PnR** by `(* keep *)`/`(* dont_touch *)` on every DCO's cells; each ring's
+  free-running DCO clock is left undefined as an SDC clock (its combinational loop has no valid
+  clock-tree root) and its Gray-coded CDC into the core clock is handled in RTL.
+- **Size for all corners**: the rings swing ~2.4× across PVT, so the programmable `mul`/`div`
+  picks a reachable ratio per chip (corner data in `../../docs/adpll_survey.md`).

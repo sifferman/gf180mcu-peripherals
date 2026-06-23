@@ -103,8 +103,11 @@ always_comb begin
     logic signed [EdgeCountWidth+1:0] error;             // signed frequency error (edges/window)
     logic signed [AccWidth-1:0]       accumulator_sum;
     logic signed [AccWidth+1:0]       control_word;      // alpha*error + beta*accumulator
-    accumulator_d = accumulator_q;
-    tune_d        = tune_q;
+    error           = '0;   // default the temporaries so no latch is inferred (used only below)
+    accumulator_sum = '0;
+    control_word    = '0;
+    accumulator_d   = accumulator_q;
+    tune_d          = tune_q;
     if (enable_i && sample_valid) begin
         error           = $signed({2'b0, dco_edge_count}) - $signed({2'b0, mul_i});
         accumulator_sum = accumulator_q + AccWidth'(error);

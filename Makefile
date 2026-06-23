@@ -1,4 +1,5 @@
 MAKEFILE_DIR := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
+SHELL := /bin/bash
 
 RUN_TAG = $(shell ls librelane/runs/ | tail -n 1)
 TOP = chip_top
@@ -160,7 +161,7 @@ sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr: ## AD
 
 sim-adpll-array: ## CSR framework: program all 12 PLLs over AXI4-Lite, poll each for lock, test obs mux
 	@mkdir -p cocotb/sim_build
-	iverilog -g2012 -o cocotb/sim_build/tb_adpll_array cocotb/models/_sim_timescale.v \
+	iverilog -g2012 -c <(printf '+timescale+1ns/1ps\n') -o cocotb/sim_build/tb_adpll_array \
 		src/csr/adpll_array_csr.sv src/adpll_array.sv src/adpll/macros/adpll_*.sv \
 		$(ADPLL_IP)/controller/adpll_controller_bangbang.sv $(ADPLL_IP)/controller/adpll_controller_linear.sv \
 		$(ADPLL_IP)/controller/adpll_controller_gearshift.sv \

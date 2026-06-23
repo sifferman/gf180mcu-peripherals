@@ -80,18 +80,19 @@ VERILOG_FILES:
 - dir::../third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi_core.v
 - dir::../third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi_pmem.v
 - dir::../src/sdram/sdram_wrap.sv
-# ADPLL array: 12 controller x DCO macros + CSR (observe-only; DCOs preserved via (* keep *)/dont_touch)
-- dir::../src/csr/adpll_array_csr.sv
-- dir::../src/adpll_array.sv
-- dir::../src/adpll/adpll_freq_counter.sv
-- dir::../src/adpll/adpll_lock_detect.sv
-- dir::../src/adpll/controller/adpll_controller_bangbang.sv
-- dir::../src/adpll/controller/adpll_controller_linear.sv
-- dir::../src/adpll/controller/adpll_controller_gearshift.sv
-- dir::../src/adpll/dco/ring_dco_binary.sv
-- dir::../src/adpll/dco/ring_dco_thermometer.sv
-- dir::../src/adpll/dco/ring_dco_muxtap.sv
-- dir::../src/adpll/dco/ring_dco_coarsefine.sv
+# ADPLL: generic building blocks from the third_party/adpll submodule (controllers, DCOs,
+# freq counter, lock detector), plus this project's integration in src/ (the 12 frozen
+# controller x DCO macros, the array, and its CSR). Observe-only; DCOs preserved via (* keep *).
+- dir::../third_party/adpll/rtl/adpll_freq_counter.sv
+- dir::../third_party/adpll/rtl/adpll_lock_detect.sv
+- dir::../third_party/adpll/rtl/controller/adpll_controller_bangbang.sv
+- dir::../third_party/adpll/rtl/controller/adpll_controller_linear.sv
+- dir::../third_party/adpll/rtl/controller/adpll_controller_gearshift.sv
+- dir::../third_party/adpll/rtl/dco/ring_dco_binary.sv
+- dir::../third_party/adpll/rtl/dco/ring_dco_thermometer.sv
+- dir::../third_party/adpll/rtl/dco/ring_dco_muxtap.sv
+- dir::../third_party/adpll/rtl/dco/ring_dco_coarsefine.sv
+# project-specific integration (this chip's macro configs + 12-PLL array + CSR)
 - dir::../src/adpll/macros/adpll_bangbang_binary.sv
 - dir::../src/adpll/macros/adpll_bangbang_thermometer.sv
 - dir::../src/adpll/macros/adpll_bangbang_muxtap.sv
@@ -104,6 +105,8 @@ VERILOG_FILES:
 - dir::../src/adpll/macros/adpll_gearshift_thermometer.sv
 - dir::../src/adpll/macros/adpll_gearshift_muxtap.sv
 - dir::../src/adpll/macros/adpll_gearshift_coarsefine.sv
+- dir::../src/csr/adpll_array_csr.sv
+- dir::../src/adpll_array.sv
 # Top + core
 - dir::../src/chip_core.sv
 - dir::../src/chip_top.sv

@@ -12,3 +12,6 @@
 [submodule "third_party/ultraembedded_axi_sdram_controller"]
 	path = third_party/ultraembedded_axi_sdram_controller
 	url = https://github.com/ultraembedded/core_sdram_axi4
+[submodule "third_party/adpll"]
+	path = third_party/adpll
+	url = git@github.com:sifferman/adpll.git

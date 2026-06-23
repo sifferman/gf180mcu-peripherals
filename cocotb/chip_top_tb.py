@@ -283,18 +283,19 @@ def chip_top_runner():
         sources.append(PROJ / "../src/axi/axil_to_axi4.sv")
         sources.append(PROJ / "../src/axi/axil_interconnect.sv")
         sources.append(PROJ / "../src/sdram/sdram_wrap.sv")
-        # ADPLL array: CSR + 12 controller x DCO macros + shared blocks
+        # ADPLL: generic blocks from the third_party/adpll submodule + this project's array/macros
+        _adpll = PROJ / "../third_party/adpll/rtl"
+        sources.append(_adpll / "adpll_freq_counter.sv")
+        sources.append(_adpll / "adpll_lock_detect.sv")
+        sources.append(_adpll / "controller/adpll_controller_bangbang.sv")
+        sources.append(_adpll / "controller/adpll_controller_linear.sv")
+        sources.append(_adpll / "controller/adpll_controller_gearshift.sv")
+        sources.append(_adpll / "dco/ring_dco_binary.sv")
+        sources.append(_adpll / "dco/ring_dco_thermometer.sv")
+        sources.append(_adpll / "dco/ring_dco_muxtap.sv")
+        sources.append(_adpll / "dco/ring_dco_coarsefine.sv")
         sources.append(PROJ / "../src/csr/adpll_array_csr.sv")
         sources.append(PROJ / "../src/adpll_array.sv")
-        sources.append(PROJ / "../src/adpll/adpll_freq_counter.sv")
-        sources.append(PROJ / "../src/adpll/adpll_lock_detect.sv")
-        sources.append(PROJ / "../src/adpll/controller/adpll_controller_bangbang.sv")
-        sources.append(PROJ / "../src/adpll/controller/adpll_controller_linear.sv")
-        sources.append(PROJ / "../src/adpll/controller/adpll_controller_gearshift.sv")
-        sources.append(PROJ / "../src/adpll/dco/ring_dco_binary.sv")
-        sources.append(PROJ / "../src/adpll/dco/ring_dco_thermometer.sv")
-        sources.append(PROJ / "../src/adpll/dco/ring_dco_muxtap.sv")
-        sources.append(PROJ / "../src/adpll/dco/ring_dco_coarsefine.sv")
         import glob as _glob
         for _m in sorted(_glob.glob(str(PROJ / "../src/adpll/macros/adpll_*.sv"))):
             sources.append(Path(_m))

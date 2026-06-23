@@ -149,87 +149,42 @@ sim-bridge: clone-pdk defines ## Bridge a UDP socket to the sim so dma.py drives
 	cd cocotb; TEST_MODULE=sim_udp_bridge PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} PAD=${PAD} SCL=${SCL} SRAM=${SRAM} python3 chip_top_tb.py
 .PHONY: sim-bridge
 
-ADPLL_TS  = cocotb/models/_sim_timescale.v
-ADPLL_RTL = $(wildcard src/adpll/*.sv src/adpll/controller/*.sv src/adpll/dco/*.sv)
-sim-adpll: ## Standalone digital ADPLL test: ring DCO (behavioural) + FLL lock (iverilog, no PDK)
-	mkdir -p cocotb/sim_build
-	iverilog -g2012 -o cocotb/sim_build/tb_adpll $(ADPLL_TS) $(ADPLL_RTL) cocotb/models/tb_adpll.v
-	vvp cocotb/sim_build/tb_adpll
-.PHONY: sim-adpll
-
-sim-adpll-csr: ## Integrated ADPLL: program mul/div/enable over AXI4-Lite CSR, poll STATUS for lock (iverilog)
-	mkdir -p cocotb/sim_build
-	iverilog -g2012 -o cocotb/sim_build/tb_adpll_csr $(ADPLL_TS) \
-		src/csr/adpll_csr.sv src/adpll/controller/adpll_controller_bangbang.sv src/adpll/adpll_freq_counter.sv \
-		src/adpll/adpll_lock_detect.sv src/adpll/dco/ring_dco_binary.sv cocotb/models/tb_adpll_csr.v
-	vvp cocotb/sim_build/tb_adpll_csr | grep -E "CSR programmed|LOCKED|PASS|FAIL"
-.PHONY: sim-adpll-csr
+# ---- ADPLL ----
+# Generic PLL IP (building blocks + their sims) lives in the third_party/adpll submodule; delegate
+# those IP sims there. The 12-PLL array (this project's integration) is built here from src/.
+ADPLL_IP    = third_party/adpll/rtl
+ADPLL_SPICE = third_party/adpll/scripts/gen_ring_dco_spice.py
+.PHONY: sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr
+sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr: ## ADPLL IP sims (delegated to third_party/adpll)
+	$(MAKE) -C third_party/adpll $@
 
 sim-adpll-array: ## CSR framework: program all 12 PLLs over AXI4-Lite, poll each for lock, test obs mux
 	@mkdir -p cocotb/sim_build
-	iverilog -g2012 -o cocotb/sim_build/tb_adpll_array $(ADPLL_TS) \
+	iverilog -g2012 -o cocotb/sim_build/tb_adpll_array cocotb/models/_sim_timescale.v \
 		src/csr/adpll_array_csr.sv src/adpll_array.sv src/adpll/macros/adpll_*.sv \
-		src/adpll/controller/adpll_controller_bangbang.sv src/adpll/controller/adpll_controller_linear.sv \
-		src/adpll/controller/adpll_controller_gearshift.sv \
-		src/adpll/adpll_freq_counter.sv src/adpll/adpll_lock_detect.sv \
-		src/adpll/dco/ring_dco_binary.sv src/adpll/dco/ring_dco_thermometer.sv \
-		src/adpll/dco/ring_dco_muxtap.sv src/adpll/dco/ring_dco_coarsefine.sv \
+		$(ADPLL_IP)/controller/adpll_controller_bangbang.sv $(ADPLL_IP)/controller/adpll_controller_linear.sv \
+		$(ADPLL_IP)/controller/adpll_controller_gearshift.sv \
+		$(ADPLL_IP)/adpll_freq_counter.sv $(ADPLL_IP)/adpll_lock_detect.sv \
+		$(ADPLL_IP)/dco/ring_dco_binary.sv $(ADPLL_IP)/dco/ring_dco_thermometer.sv \
+		$(ADPLL_IP)/dco/ring_dco_muxtap.sv $(ADPLL_IP)/dco/ring_dco_coarsefine.sv \
 		cocotb/models/tb_adpll_array.v
 	vvp cocotb/sim_build/tb_adpll_array | grep -E "programmed|LOCKED|PASS|FAIL|obs mux"
 .PHONY: sim-adpll-array
-
-sim-adpll-survey: ## Compare the ADPLL controller variants (bang-bang / linear / gearshift PI): lock time + code
-	@mkdir -p cocotb/sim_build
-	@for ctrl in "bang-bang:" "linear:-DCTRL_LINEAR" "gearshift:-DCTRL_GEARSHIFT"; do \
-		name=$${ctrl%%:*}; def=$${ctrl#*:}; \
-		echo "==== controller: $$name ===="; \
-		iverilog -g2012 $$def -o cocotb/sim_build/tb_adpll_$$name $(ADPLL_TS) $(ADPLL_RTL) cocotb/models/tb_adpll.v && \
-		vvp cocotb/sim_build/tb_adpll_$$name | grep -E "LOCKED|PASS|FAIL"; \
-	done
-.PHONY: sim-adpll-survey
-
-sim-adpll-matrix: ## Verify ALL 12 ADPLL variants (3 controllers x 4 DCOs): lock time + settled tune
-	@mkdir -p cocotb/sim_build
-	@printf "%-26s %-12s %-8s %s\n" "config (ctrl x dco)" "lock_cyc" "tune" "result"
-	@for ctrl in "bb:" "lin:-DCTRL_LINEAR" "gear:-DCTRL_GEARSHIFT"; do \
-		for dco in "binary:" "therm:-DDCO_THERM" "muxtap:-DDCO_MUXTAP" "cfine:-DDCO_COARSEFINE"; do \
-			cn=$${ctrl%%:*}; cd=$${ctrl#*:}; dn=$${dco%%:*}; dd=$${dco#*:}; \
-			iverilog -g2012 $$cd $$dd -o cocotb/sim_build/tb_mx_$${cn}_$${dn} $(ADPLL_TS) $(ADPLL_RTL) cocotb/models/tb_adpll.v 2>/dev/null && \
-			out=$$(vvp cocotb/sim_build/tb_mx_$${cn}_$${dn} 2>/dev/null); \
-			cyc=$$(echo "$$out" | grep -oE "lock_time=[0-9]+" | grep -oE "[0-9]+"); \
-			tune=$$(echo "$$out" | grep -oE "tune=[0-9]+ in-range" | grep -oE "[0-9]+"); \
-			res=$$(echo "$$out" | grep -oE "PASS|FAIL" | head -1); \
-			printf "%-26s %-12s %-8s %s\n" "$$cn x $$dn" "$${cyc:-N/A}" "$${tune:-N/A}" "$${res:-NO-LOCK}"; \
-		done; \
-	done
-.PHONY: sim-adpll-matrix
-
-sim-adpll-phase: ## Phase-domain ADPLL (TDC + reference/variable phase accumulators): true phase lock
-	@mkdir -p cocotb/sim_build
-	iverilog -g2012 -o cocotb/sim_build/tb_adpll_phase $(ADPLL_TS) \
-		src/adpll/adpll_freq_counter.sv src/adpll/adpll_lock_detect.sv src/adpll/adpll_tdc.sv \
-		src/adpll/controller/adpll_controller_phase.sv src/adpll/dco/ring_dco_binary.sv \
-		cocotb/models/tb_adpll_phase.v
-	vvp cocotb/sim_build/tb_adpll_phase | grep -E "LOCKED|PASS|FAIL"
-.PHONY: sim-adpll-phase
 
 # ngspice >= 42 is required for the gf180 BSIM4 models (mulu0 et al); override NGSPICE
 # to point at a new enough build if the default is too old.
 NGSPICE ?= ngspice
 dco-spice: clone-pdk ## Export ring_dco to SPICE and sweep tune codes through ngspice (freq-vs-code)
-	python3 src/adpll/dco/gen_ring_dco_spice.py --pdk-root $(PDK_ROOT) --pdk $(PDK) --ngspice $(NGSPICE) \
+	python3 $(ADPLL_SPICE) --pdk-root $(PDK_ROOT) --pdk $(PDK) --ngspice $(NGSPICE) \
 		--bits 7 --sweep 0,4,8,16,32,64,96,127 --run --workdir cocotb/sim_build
 .PHONY: dco-spice
 
-# Corner DCO characterization uses the binary ring_dco (what gen_ring_dco_spice emits).
-# DCO_BITS trims the ring for faster corner runs (the thermometer/muxtap variants share the
-# same behavioural curve; their structural SPICE emitters are a follow-up).
 DCO_BITS ?= 7
 dco-spice-corners: clone-pdk ## DCO freq-vs-code across SS/TT/FF PVT corners (ngspice) -- run regularly
 	@for corner in "ss 3.0 125" "typical 3.3 25" "ff 3.6 -40"; do \
 		set -- $$corner; \
 		echo "==== corner $$1 / $$2 V / $$3 C ===="; \
-		python3 src/adpll/dco/gen_ring_dco_spice.py --pdk-root $(PDK_ROOT) --pdk $(PDK) --ngspice $(NGSPICE) \
+		python3 $(ADPLL_SPICE) --pdk-root $(PDK_ROOT) --pdk $(PDK) --ngspice $(NGSPICE) \
 			--bits $(DCO_BITS) --corner $$1 --vdd $$2 --temp $$3 \
 			--sweep 0,16,32,64,96,127 --run --workdir cocotb/sim_build; \
 	done

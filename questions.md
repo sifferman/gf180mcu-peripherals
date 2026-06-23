@@ -59,12 +59,23 @@ aside** (recoverable) to `/home/esifferm/Utils/ciel-pdks/gf180mcuD.stale-bak-202
 don't want it. (This also means `make sim` needs PDK_ROOT pointing such that $PDK_ROOT/gf180mcuD
 resolves -- now fixed via the symlink.)
 
-### Harden status
-`make librelane` (full Chip flow to GDS) launched in the background after the PDK fix; synthesis
-passed (the ~192 "no driver"/"missing pin" lines are the known-benign verilog-ethernet PTP/unused
-ports, gated by ERROR_ON_SYNTH_CHECKS:false). Outcome (GDS / DRC / LVS / antenna) recorded here
-when it finishes; if a stage fails I iterate (likely area/density for 12 extra PLLs, or the 12
-ring-DCO combinational-loop domains).
+### Harden status -- CLEAN SIGN-OFF GDS (RUN_2026-06-23_00-59-30)
+`make librelane` completed exit 0 -> `final/gds/chip_top.gds` (regenerable; final/ + runs/ are
+gitignored, so not committed). Sign-off gates ALL CLEAN with the 12-PLL array:
+  - magic DRC = 0, klayout DRC = 0
+  - **LVS errors = 0** (the 12 PLLs + their ring-DCO clock domains netlist-match -- the M3 worry
+    is resolved; each ring's free-running clk is left undefined in SDC and its CDC is Gray-coded)
+  - antenna violating nets = 0 (305 diodes inserted)
+  - timing: setup WNS +2.38 ns, hold WNS +0.27 ns (both met)
+  - utilization 50.9%, instance count ~772k (incl. fill), 1x1 die. Render:
+    librelane/runs/RUN_2026-06-23_00-59-30/63-klayout-render/chip_top.png
+
+FOLLOW-UP (non-fatal warnings, did NOT gate the GDS -- review before a real tapeout):
+  - max_fanout violations 2310, max_cap 840, max_slew 55 -- concentrated on the high-fanout
+    enable/reset nets feeding all 12 PLLs and the unconstrained ring-DCO domains. For observe-only
+    PLLs this is tolerable; to clean up, buffer the broadcast enable/rst (or per-PLL pipeline a
+    reset) and/or add max_transition/cap constraints on the DCO nets. Not addressed now to keep the
+    clean-GDS result stable.
 
 ### (earlier variant decisions below)
 All three variants built, validated (behavioural lock + yosys elaboration), committed locally:

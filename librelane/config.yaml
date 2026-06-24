@@ -82,8 +82,8 @@ VERILOG_FILES:
 - dir::../src/sdram/sdram_wrap.sv
 # ADPLL: generic building blocks from the third_party/adpll submodule (frequency detector,
 # loop filters, freq counter, lock detector, DCOs + the PDK cell shim), plus this project's
-# integration in src/ (the 12 frozen loop-filter x DCO macros, the array, and its CSR). The 12
-# macros are all frequency-locked, so the phase detector / TDC are not built in. The ring DCOs'
+# integration in src/ (the 12 fixed loop-filter x DCO configs, the array, and its CSR). The 12
+# configs are all frequency-locked, so the phase detector / TDC are not built in. The ring DCOs'
 # synthesis path instantiates the rtl/tech_cells/ primitives (gf180 cells, (* keep *)/(* dont_touch *)),
 # so those are listed too. Observe-only.
 - dir::../third_party/adpll/rtl/tech_cells/adpll_cell_nand2.sv
@@ -99,19 +99,19 @@ VERILOG_FILES:
 - dir::../third_party/adpll/rtl/dco/ring_dco_thermometer.sv
 - dir::../third_party/adpll/rtl/dco/ring_dco_muxtap.sv
 - dir::../third_party/adpll/rtl/dco/ring_dco_coarsefine.sv
-# project-specific integration (this chip's macro configs + 12-PLL array + CSR)
-- dir::../src/adpll/macros/adpll_bangbang_binary.sv
-- dir::../src/adpll/macros/adpll_bangbang_thermometer.sv
-- dir::../src/adpll/macros/adpll_bangbang_muxtap.sv
-- dir::../src/adpll/macros/adpll_bangbang_coarsefine.sv
-- dir::../src/adpll/macros/adpll_linear_binary.sv
-- dir::../src/adpll/macros/adpll_linear_thermometer.sv
-- dir::../src/adpll/macros/adpll_linear_muxtap.sv
-- dir::../src/adpll/macros/adpll_linear_coarsefine.sv
-- dir::../src/adpll/macros/adpll_gearshift_binary.sv
-- dir::../src/adpll/macros/adpll_gearshift_thermometer.sv
-- dir::../src/adpll/macros/adpll_gearshift_muxtap.sv
-- dir::../src/adpll/macros/adpll_gearshift_coarsefine.sv
+# project-specific integration (this chip's adpll configs + 12-PLL array + CSR)
+- dir::../third_party/adpll/rtl/adpll/adpll_bangbang_binary.sv
+- dir::../third_party/adpll/rtl/adpll/adpll_bangbang_thermometer.sv
+- dir::../third_party/adpll/rtl/adpll/adpll_bangbang_muxtap.sv
+- dir::../third_party/adpll/rtl/adpll/adpll_bangbang_coarsefine.sv
+- dir::../third_party/adpll/rtl/adpll/adpll_linear_binary.sv
+- dir::../third_party/adpll/rtl/adpll/adpll_linear_thermometer.sv
+- dir::../third_party/adpll/rtl/adpll/adpll_linear_muxtap.sv
+- dir::../third_party/adpll/rtl/adpll/adpll_linear_coarsefine.sv
+- dir::../third_party/adpll/rtl/adpll/adpll_gearshift_binary.sv
+- dir::../third_party/adpll/rtl/adpll/adpll_gearshift_thermometer.sv
+- dir::../third_party/adpll/rtl/adpll/adpll_gearshift_muxtap.sv
+- dir::../third_party/adpll/rtl/adpll/adpll_gearshift_coarsefine.sv
 - dir::../src/csr/adpll_array_csr.sv
 - dir::../src/adpll_array.sv
 # Top + core

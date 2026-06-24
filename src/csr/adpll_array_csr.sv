@@ -26,7 +26,7 @@
 
 // adpll_array_csr
 //
-// AXI4-Lite control/status registers for an array of NumPll ADPLL macros. Each PLL has its own
+// AXI4-Lite control/status registers for an array of NumPll ADPLLs. Each PLL has its own
 // enable / mul / div (programmed independently over Ethernet) and reports lock + tune; one global
 // register selects which PLL's clock + lock drive the shared observation outputs. Single
 // outstanding transaction, same handshake as axil_ram / adpll_csr.
@@ -39,8 +39,8 @@
 //   NumPll*0x10   OBS_SEL    [SelWidth-1:0] observed PLL index (R/W)
 //
 // Parameters:
-//   - NumPll      : number of ADPLL macros
-//   - NumTuneBits, MaxEdgesPerWindow, MaxWindowSize : PLL widths (must match the macros)
+//   - NumPll      : number of ADPLLs
+//   - NumTuneBits, MaxEdgesPerWindow, MaxWindowSize : PLL widths (must match the ADPLLs)
 // Ports: AXI4-Lite slave + flattened per-PLL control out / status in + obs_sel_o
 
 module adpll_array_csr #(

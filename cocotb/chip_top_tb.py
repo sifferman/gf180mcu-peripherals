@@ -298,7 +298,7 @@ def chip_top_runner():
         sources.append(PROJ / "../src/csr/adpll_array_csr.sv")
         sources.append(PROJ / "../src/adpll_array.sv")
         import glob as _glob
-        for _m in sorted(_glob.glob(str(PROJ / "../src/adpll/macros/adpll_*.sv"))):
+        for _m in sorted(_glob.glob(str(PROJ / "../third_party/adpll/rtl/adpll/adpll_*.sv"))):
             sources.append(Path(_m))
         _sdc = PROJ / "../third_party/ultraembedded_axi_sdram_controller/src_v"
         sources += [_sdc / "sdram_axi.v", _sdc / "sdram_axi_core.v", _sdc / "sdram_axi_pmem.v"]

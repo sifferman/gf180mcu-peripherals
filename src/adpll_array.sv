@@ -25,15 +25,15 @@
 // POSSIBILITY OF SUCH DAMAGE.
 // adpll_array
 //
-// The 12-PLL ADPLL subsystem: every loop-filter x DCO macro (3 loop filters x 4 DCOs) instantiated
+// The 12-PLL ADPLL subsystem: every loop-filter x DCO config (3 loop filters x 4 DCOs) instantiated
 // once and wired to adpll_array_csr, so a host programs each PLL independently over Ethernet
 // (enable/mul/div) and reads its lock/tune. A CSR-selected observation mux routes one PLL's DCO
 // clock + lock to the shared observation outputs (the chip has far fewer pads than 12 PLLs, so
-// observation is multiplexed -- every PLL still runs and is read back over the CSR). The macros are
-// frozen blocks with no parameters; this wrapper's widths (defaults) match their fixed 7/24/16 config.
+// observation is multiplexed -- every PLL still runs and is read back over the CSR). The configs are
+// param-free (each a fixed loop-filter x DCO); this wrapper's widths (defaults) match their 7/24/16.
 //
 // Parameters:
-//   - NumTuneBits, MaxEdgesPerWindow, MaxWindowSize : widths shared by the CSR (must match the macros)
+//   - NumTuneBits, MaxEdgesPerWindow, MaxWindowSize : widths shared by the CSR (must match the configs)
 // Ports: AXI4-Lite slave (PLL control/status over the fabric) + obs_dco_clk_o / obs_lock_o
 
 module adpll_array #(

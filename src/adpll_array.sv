@@ -25,7 +25,7 @@
 // POSSIBILITY OF SUCH DAMAGE.
 // adpll_array
 //
-// The 12-PLL ADPLL subsystem: every controller x DCO macro (3 controllers x 4 DCOs) instantiated
+// The 12-PLL ADPLL subsystem: every loop-filter x DCO macro (3 loop filters x 4 DCOs) instantiated
 // once and wired to adpll_array_csr, so a host programs each PLL independently over Ethernet
 // (enable/mul/div) and reads its lock/tune. A CSR-selected observation mux routes one PLL's DCO
 // clock + lock to the shared observation outputs (the chip has far fewer pads than 12 PLLs, so

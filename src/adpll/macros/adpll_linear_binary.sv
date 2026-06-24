@@ -26,17 +26,18 @@
 
 // adpll_linear_binary
 //
-// Ref: Kratyuk TCAS-II 2007 (linear PI); Staszewski Wiley 2006 Ch.2-3 (binary). See the controller / DCO files for detail.
-// Hardened-macro wrapper for one FIXED ADPLL config = linear controller + binary DCO. A macro is a
-// frozen GDS block, so it has NO parameters: the configuration (7-bit tune code, 24-bit edge count,
-// 16-bit window) is fixed here and passed to the controller/DCO. Each controller x DCO combination
-// is its own DESIGN_NAME, presented to the chip as a black box.
+// Ref: Kratyuk TCAS-II 2007 (linear power-of-two alpha/beta PI); Staszewski Wiley 2006 Ch.2-3 (binary-weighted delay select). See the loop-filter / DCO source files for detail.
+// Hardened-macro wrapper for one FIXED ADPLL config = linear loop filter + binary DCO, assembled
+// from the generic adpll blocks (detector -> loop filter -> DCO, plus lock detect; no "controller"
+// wrapper). A macro is a frozen GDS block, so it has NO parameters: the configuration (7-bit tune
+// code, 24-bit edge count, 16-bit window) is fixed here. Each loop-filter x DCO combination is its
+// own DESIGN_NAME, presented to the chip as a black box.
 //
 // Ports:
 //   - clk_i, rst_ni, enable_i : run + program
-//   - mul_i, div_i  : synthesizer ratio N / M (set over the CSR)
+//   - mul_i, div_i   : synthesizer ratio N / M (set over the CSR)
 //   - lock_o, tune_o : status
-//   - dco_clk_o     : raw DCO clock, brought out for observation
+//   - dco_clk_o      : raw DCO clock, brought out for observation
 
 module adpll_linear_binary (
     input  wire        clk_i,
@@ -53,23 +54,55 @@ module adpll_linear_binary (
 localparam int unsigned NumTuneBits       = 7;
 localparam int unsigned MaxEdgesPerWindow = (1 << 24) - 1;
 localparam int unsigned MaxWindowSize     = (1 << 16) - 1;
+localparam int unsigned ErrorWidth        = $clog2(MaxEdgesPerWindow + 1) + 2;  // = adpll_freq_detector.ErrorWidth
 
-wire [NumTuneBits-1:0] tune;
-wire                   dco_clk;
+wire signed [ErrorWidth-1:0] error;
+wire                         valid;
+wire [NumTuneBits-1:0]       tune;
+wire [NumTuneBits-1:0]       lock_sample;
+wire                         dco_clk;
 
-adpll_controller_linear #(
-    .NumTuneBits(NumTuneBits),
+// detector: DCO edges over a div_i window vs mul_i -> signed frequency error
+adpll_freq_detector #(
     .MaxEdgesPerWindow(MaxEdgesPerWindow),
-    .MaxWindowSize(MaxWindowSize)
-) adpll_controller_linear (
-    .clk_i    (clk_i),
-    .rst_ni   (rst_ni),
-    .enable_i (enable_i),
-    .mul_i    (mul_i),
-    .div_i    (div_i),
-    .dco_clk_i(dco_clk),
-    .tune_o   (tune),
-    .lock_o   (lock_o)
+    .MaxWindowSize    (MaxWindowSize)
+) adpll_freq_detector (
+    .clk_i          (clk_i),
+    .rst_ni         (rst_ni),
+    .enable_i       (enable_i),
+    .target_i       (mul_i),
+    .window_length_i(div_i),
+    .dco_clk_i      (dco_clk),
+    .error_o        (error),
+    .valid_o        (valid)
+);
+
+// loop filter: maps the frequency error to the DCO tune code
+adpll_loop_filter_pi #(
+    .NumTuneBits(NumTuneBits),
+    .ErrorWidth (ErrorWidth)
+) adpll_loop_filter_pi (
+    .clk_i        (clk_i),
+    .rst_ni       (rst_ni),
+    .enable_i     (enable_i),
+    .valid_i      (valid),
+    .error_i      (error),
+    .tune_o       (tune),
+    .lock_sample_o(lock_sample)
+);
+
+// lock detect: watches the settled tune sample
+adpll_lock_detect #(
+    .SampleWidth      (NumTuneBits),
+    .MinSamplesForLock(8),
+    .BandRadius       (2)
+) adpll_lock_detect (
+    .clk_i          (clk_i),
+    .rst_ni         (rst_ni),
+    .enable_i       (enable_i),
+    .sample_valid_i (valid),
+    .tuning_sample_i(lock_sample),
+    .lock_o         (lock_o)
 );
 
 ring_dco_binary #(

@@ -286,10 +286,11 @@ def chip_top_runner():
         # ADPLL: generic blocks from the third_party/adpll submodule + this project's array/macros
         _adpll = PROJ / "../third_party/adpll/rtl"
         sources.append(_adpll / "adpll_freq_counter.sv")
+        sources.append(_adpll / "adpll_freq_detector.sv")
         sources.append(_adpll / "adpll_lock_detect.sv")
-        sources.append(_adpll / "controller/adpll_controller_bangbang.sv")
-        sources.append(_adpll / "controller/adpll_controller_linear.sv")
-        sources.append(_adpll / "controller/adpll_controller_gearshift.sv")
+        sources.append(_adpll / "loop_filter/adpll_loop_filter_bangbang.sv")
+        sources.append(_adpll / "loop_filter/adpll_loop_filter_pi.sv")
+        sources.append(_adpll / "loop_filter/adpll_loop_filter_gearshift.sv")
         sources.append(_adpll / "dco/ring_dco_binary.sv")
         sources.append(_adpll / "dco/ring_dco_thermometer.sv")
         sources.append(_adpll / "dco/ring_dco_muxtap.sv")

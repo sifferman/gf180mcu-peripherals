@@ -121,10 +121,11 @@ Living tracker. See `questions.md` for decisions/risks and
   bang-bang frequency-locked control (`adpll_ctrl.sv`, Gray-CDC edge counter, tune-band lock).
   `make sim-adpll` PASS (DCO oscillates monotonically with tune; FLL converges and locks).
   Standalone IP — not yet wired into chip_top (CSR control + analog observe pads = later step).
-- **DCO SPICE characterized** (`src/adpll/gen_ring_dco_spice.py`, `make dco-spice`): exports the
-  ring from gf180 transistor-level cell subckts and sweeps tune codes through ngspice
-  (needs ngspice >= 42 for the BSIM4 models; the system ngspice-34 is too old — used the nix
-  ngspice-45). Low codes give the expected monotonic tuning (code 0 ~337 MHz -> code 16
+- **DCO SPICE characterized** (ngspice >= 42 for the BSIM4 models; the system ngspice-34 is too
+  old — used the nix ngspice-45). Earlier runs exported the ring from gf180 transistor-level cell
+  subckts and swept tune codes; that hand-written generator has been removed and the flow is being
+  moved to OpenROAD/Magic parasitic extraction from the hardened ring_dco macro (single source of
+  truth = the .sv). Low codes give the expected monotonic tuning (code 0 ~337 MHz -> code 16
   ~184 MHz, typical corner). High codes (32-127) read erratic/higher — consistent with
   multi-mode oscillation in the long ring (multiple wavefronts); a production DCO would
   constrain stage count / add single-edge startup. Usable monotonic range is the low codes.

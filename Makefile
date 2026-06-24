@@ -154,7 +154,6 @@ sim-bridge: clone-pdk defines ## Bridge a UDP socket to the sim so dma.py drives
 # Generic PLL IP (building blocks + their sims) lives in the third_party/adpll submodule; delegate
 # those IP sims there. The 12-PLL array (this project's integration) is built here from src/.
 ADPLL_IP    = third_party/adpll/rtl
-ADPLL_SPICE = third_party/adpll/scripts/gen_ring_dco_spice.py
 .PHONY: sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr
 sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr: ## ADPLL IP sims (delegated to third_party/adpll)
 	$(MAKE) -C third_party/adpll $@
@@ -172,21 +171,6 @@ sim-adpll-array: ## CSR framework: program all 12 PLLs over AXI4-Lite, poll each
 	vvp cocotb/sim_build/tb_adpll_array | grep -E "programmed|LOCKED|PASS|FAIL|obs mux"
 .PHONY: sim-adpll-array
 
-# ngspice >= 42 is required for the gf180 BSIM4 models (mulu0 et al); override NGSPICE
-# to point at a new enough build if the default is too old.
-NGSPICE ?= ngspice
-dco-spice: clone-pdk ## Export ring_dco to SPICE and sweep tune codes through ngspice (freq-vs-code)
-	python3 $(ADPLL_SPICE) --pdk-root $(PDK_ROOT) --pdk $(PDK) --ngspice $(NGSPICE) \
-		--bits 7 --sweep 0,4,8,16,32,64,96,127 --run --workdir cocotb/sim_build
-.PHONY: dco-spice
-
-DCO_BITS ?= 7
-dco-spice-corners: clone-pdk ## DCO freq-vs-code across SS/TT/FF PVT corners (ngspice) -- run regularly
-	@for corner in "ss 3.0 125" "typical 3.3 25" "ff 3.6 -40"; do \
-		set -- $$corner; \
-		echo "==== corner $$1 / $$2 V / $$3 C ===="; \
-		python3 $(ADPLL_SPICE) --pdk-root $(PDK_ROOT) --pdk $(PDK) --ngspice $(NGSPICE) \
-			--bits $(DCO_BITS) --corner $$1 --vdd $$2 --temp $$3 \
-			--sweep 0,16,32,64,96,127 --run --workdir cocotb/sim_build; \
-	done
-.PHONY: dco-spice-corners
+# DCO SPICE characterization (freq-vs-code, PVT corners) is being moved to OpenROAD/Magic
+# parasitic extraction from the hardened ring_dco macros (single source of truth = the .sv),
+# replacing the former hand-written schematic-netlist generator. No make target yet.

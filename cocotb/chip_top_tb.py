@@ -284,11 +284,11 @@ def chip_top_runner():
         sources.append(PROJ / "../src/axi/axil_interconnect.sv")
         sources.append(PROJ / "../src/sdram/sdram_wrap.sv")
         # ADPLL: generic blocks from the third_party/adpll submodule + this project's array/macros.
-        # rtl/cells/ are the PDK primitives the ring DCOs instantiate on the synthesis path.
+        # NOTE: rtl/tech_cells/ (the PDK primitives) are NOT listed -- this RTL sim uses the DCOs'
+        # behavioural model (no cells instantiated), and the cells select a target via a `string`
+        # parameter that the icarus front end mis-handles. The cells are a synthesis concern
+        # (listed in librelane/config.yaml, elaborated by yosys+slang).
         _adpll = PROJ / "../third_party/adpll/rtl"
-        sources.append(_adpll / "cells/adpll_cell_nand.sv")
-        sources.append(_adpll / "cells/adpll_cell_inv.sv")
-        sources.append(_adpll / "cells/adpll_cell_mux.sv")
         sources.append(_adpll / "adpll_freq_counter.sv")
         sources.append(_adpll / "adpll_freq_detector.sv")
         sources.append(_adpll / "adpll_lock_detector.sv")

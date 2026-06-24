@@ -81,13 +81,17 @@ VERILOG_FILES:
 - dir::../third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi_pmem.v
 - dir::../src/sdram/sdram_wrap.sv
 # ADPLL: generic building blocks from the third_party/adpll submodule (frequency detector,
-# loop filters, freq counter, lock detector, DCOs), plus this project's integration in src/
-# (the 12 frozen loop-filter x DCO macros, the array, and its CSR). The 12 macros are all
-# frequency-locked, so the phase detector / TDC are not built in. Observe-only; DCOs preserved
-# via (* keep *).
+# loop filters, freq counter, lock detector, DCOs + the PDK cell shim), plus this project's
+# integration in src/ (the 12 frozen loop-filter x DCO macros, the array, and its CSR). The 12
+# macros are all frequency-locked, so the phase detector / TDC are not built in. The ring DCOs'
+# synthesis path instantiates the rtl/cells/ primitives (gf180 cells, (* keep *)/(* dont_touch *)),
+# so those are listed too. Observe-only.
+- dir::../third_party/adpll/rtl/cells/adpll_cell_nand.sv
+- dir::../third_party/adpll/rtl/cells/adpll_cell_inv.sv
+- dir::../third_party/adpll/rtl/cells/adpll_cell_mux.sv
 - dir::../third_party/adpll/rtl/adpll_freq_counter.sv
 - dir::../third_party/adpll/rtl/adpll_freq_detector.sv
-- dir::../third_party/adpll/rtl/adpll_lock_detect.sv
+- dir::../third_party/adpll/rtl/adpll_lock_detector.sv
 - dir::../third_party/adpll/rtl/loop_filter/adpll_loop_filter_bangbang.sv
 - dir::../third_party/adpll/rtl/loop_filter/adpll_loop_filter_pi.sv
 - dir::../third_party/adpll/rtl/loop_filter/adpll_loop_filter_gearshift.sv

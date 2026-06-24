@@ -283,11 +283,15 @@ def chip_top_runner():
         sources.append(PROJ / "../src/axi/axil_to_axi4.sv")
         sources.append(PROJ / "../src/axi/axil_interconnect.sv")
         sources.append(PROJ / "../src/sdram/sdram_wrap.sv")
-        # ADPLL: generic blocks from the third_party/adpll submodule + this project's array/macros
+        # ADPLL: generic blocks from the third_party/adpll submodule + this project's array/macros.
+        # rtl/cells/ are the PDK primitives the ring DCOs instantiate on the synthesis path.
         _adpll = PROJ / "../third_party/adpll/rtl"
+        sources.append(_adpll / "cells/adpll_cell_nand.sv")
+        sources.append(_adpll / "cells/adpll_cell_inv.sv")
+        sources.append(_adpll / "cells/adpll_cell_mux.sv")
         sources.append(_adpll / "adpll_freq_counter.sv")
         sources.append(_adpll / "adpll_freq_detector.sv")
-        sources.append(_adpll / "adpll_lock_detect.sv")
+        sources.append(_adpll / "adpll_lock_detector.sv")
         sources.append(_adpll / "loop_filter/adpll_loop_filter_bangbang.sv")
         sources.append(_adpll / "loop_filter/adpll_loop_filter_pi.sv")
         sources.append(_adpll / "loop_filter/adpll_loop_filter_gearshift.sv")

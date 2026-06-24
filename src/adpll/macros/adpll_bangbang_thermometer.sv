@@ -92,11 +92,11 @@ adpll_loop_filter_bangbang #(
 );
 
 // lock detect: watches the settled tune sample
-adpll_lock_detect #(
+adpll_lock_detector #(
     .SampleWidth      (NumTuneBits),
     .MinSamplesForLock(8),
     .BandRadius       (1)
-) adpll_lock_detect (
+) adpll_lock_detector (
     .clk_i          (clk_i),
     .rst_ni         (rst_ni),
     .enable_i       (enable_i),

@@ -121,132 +121,156 @@ adpll_bangbang_binary adpll_bangbang_binary (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[0]),
-    .mul_i    (pll_mul[0*EdgeCountWidth +: EdgeCountWidth]),
-    .div_i    (pll_div[0*WindowSizeWidth +: WindowSizeWidth]),
+    .ref_mul_i(pll_mul[0*EdgeCountWidth +: EdgeCountWidth]),
+    .ref_div_i(pll_div[0*WindowSizeWidth +: WindowSizeWidth]),
+    .post_div_i(8'd1),   // edge divider passthrough in this harness
+    .clk_o    (),         // synthesized output unused here (observe the DCO below)
     .lock_o   (pll_lock[0]),
     .debug_dco_tune_o(pll_tune[0*NumTuneBits +: NumTuneBits]),
-    .dco_clk_o(pll_dco_clk[0])
+    .debug_dco_clk_o(pll_dco_clk[0])
 );
 
 adpll_bangbang_thermometer adpll_bangbang_thermometer (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[1]),
-    .mul_i    (pll_mul[1*EdgeCountWidth +: EdgeCountWidth]),
-    .div_i    (pll_div[1*WindowSizeWidth +: WindowSizeWidth]),
+    .ref_mul_i(pll_mul[1*EdgeCountWidth +: EdgeCountWidth]),
+    .ref_div_i(pll_div[1*WindowSizeWidth +: WindowSizeWidth]),
+    .post_div_i(8'd1),   // edge divider passthrough in this harness
+    .clk_o    (),         // synthesized output unused here (observe the DCO below)
     .lock_o   (pll_lock[1]),
     .debug_dco_tune_o(pll_tune[1*NumTuneBits +: NumTuneBits]),
-    .dco_clk_o(pll_dco_clk[1])
+    .debug_dco_clk_o(pll_dco_clk[1])
 );
 
 adpll_bangbang_muxtap adpll_bangbang_muxtap (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[2]),
-    .mul_i    (pll_mul[2*EdgeCountWidth +: EdgeCountWidth]),
-    .div_i    (pll_div[2*WindowSizeWidth +: WindowSizeWidth]),
+    .ref_mul_i(pll_mul[2*EdgeCountWidth +: EdgeCountWidth]),
+    .ref_div_i(pll_div[2*WindowSizeWidth +: WindowSizeWidth]),
+    .post_div_i(8'd1),   // edge divider passthrough in this harness
+    .clk_o    (),         // synthesized output unused here (observe the DCO below)
     .lock_o   (pll_lock[2]),
     .debug_dco_tune_o(pll_tune[2*NumTuneBits +: NumTuneBits]),
-    .dco_clk_o(pll_dco_clk[2])
+    .debug_dco_clk_o(pll_dco_clk[2])
 );
 
 adpll_bangbang_coarsefine adpll_bangbang_coarsefine (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[3]),
-    .mul_i    (pll_mul[3*EdgeCountWidth +: EdgeCountWidth]),
-    .div_i    (pll_div[3*WindowSizeWidth +: WindowSizeWidth]),
+    .ref_mul_i(pll_mul[3*EdgeCountWidth +: EdgeCountWidth]),
+    .ref_div_i(pll_div[3*WindowSizeWidth +: WindowSizeWidth]),
+    .post_div_i(8'd1),   // edge divider passthrough in this harness
+    .clk_o    (),         // synthesized output unused here (observe the DCO below)
     .lock_o   (pll_lock[3]),
     .debug_dco_tune_o(pll_tune[3*NumTuneBits +: NumTuneBits]),
-    .dco_clk_o(pll_dco_clk[3])
+    .debug_dco_clk_o(pll_dco_clk[3])
 );
 
 adpll_linear_binary adpll_linear_binary (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[4]),
-    .mul_i    (pll_mul[4*EdgeCountWidth +: EdgeCountWidth]),
-    .div_i    (pll_div[4*WindowSizeWidth +: WindowSizeWidth]),
+    .ref_mul_i(pll_mul[4*EdgeCountWidth +: EdgeCountWidth]),
+    .ref_div_i(pll_div[4*WindowSizeWidth +: WindowSizeWidth]),
+    .post_div_i(8'd1),   // edge divider passthrough in this harness
+    .clk_o    (),         // synthesized output unused here (observe the DCO below)
     .lock_o   (pll_lock[4]),
     .debug_dco_tune_o(pll_tune[4*NumTuneBits +: NumTuneBits]),
-    .dco_clk_o(pll_dco_clk[4])
+    .debug_dco_clk_o(pll_dco_clk[4])
 );
 
 adpll_linear_thermometer adpll_linear_thermometer (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[5]),
-    .mul_i    (pll_mul[5*EdgeCountWidth +: EdgeCountWidth]),
-    .div_i    (pll_div[5*WindowSizeWidth +: WindowSizeWidth]),
+    .ref_mul_i(pll_mul[5*EdgeCountWidth +: EdgeCountWidth]),
+    .ref_div_i(pll_div[5*WindowSizeWidth +: WindowSizeWidth]),
+    .post_div_i(8'd1),   // edge divider passthrough in this harness
+    .clk_o    (),         // synthesized output unused here (observe the DCO below)
     .lock_o   (pll_lock[5]),
     .debug_dco_tune_o(pll_tune[5*NumTuneBits +: NumTuneBits]),
-    .dco_clk_o(pll_dco_clk[5])
+    .debug_dco_clk_o(pll_dco_clk[5])
 );
 
 adpll_linear_muxtap adpll_linear_muxtap (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[6]),
-    .mul_i    (pll_mul[6*EdgeCountWidth +: EdgeCountWidth]),
-    .div_i    (pll_div[6*WindowSizeWidth +: WindowSizeWidth]),
+    .ref_mul_i(pll_mul[6*EdgeCountWidth +: EdgeCountWidth]),
+    .ref_div_i(pll_div[6*WindowSizeWidth +: WindowSizeWidth]),
+    .post_div_i(8'd1),   // edge divider passthrough in this harness
+    .clk_o    (),         // synthesized output unused here (observe the DCO below)
     .lock_o   (pll_lock[6]),
     .debug_dco_tune_o(pll_tune[6*NumTuneBits +: NumTuneBits]),
-    .dco_clk_o(pll_dco_clk[6])
+    .debug_dco_clk_o(pll_dco_clk[6])
 );
 
 adpll_linear_coarsefine adpll_linear_coarsefine (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[7]),
-    .mul_i    (pll_mul[7*EdgeCountWidth +: EdgeCountWidth]),
-    .div_i    (pll_div[7*WindowSizeWidth +: WindowSizeWidth]),
+    .ref_mul_i(pll_mul[7*EdgeCountWidth +: EdgeCountWidth]),
+    .ref_div_i(pll_div[7*WindowSizeWidth +: WindowSizeWidth]),
+    .post_div_i(8'd1),   // edge divider passthrough in this harness
+    .clk_o    (),         // synthesized output unused here (observe the DCO below)
     .lock_o   (pll_lock[7]),
     .debug_dco_tune_o(pll_tune[7*NumTuneBits +: NumTuneBits]),
-    .dco_clk_o(pll_dco_clk[7])
+    .debug_dco_clk_o(pll_dco_clk[7])
 );
 
 adpll_gearshift_binary adpll_gearshift_binary (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[8]),
-    .mul_i    (pll_mul[8*EdgeCountWidth +: EdgeCountWidth]),
-    .div_i    (pll_div[8*WindowSizeWidth +: WindowSizeWidth]),
+    .ref_mul_i(pll_mul[8*EdgeCountWidth +: EdgeCountWidth]),
+    .ref_div_i(pll_div[8*WindowSizeWidth +: WindowSizeWidth]),
+    .post_div_i(8'd1),   // edge divider passthrough in this harness
+    .clk_o    (),         // synthesized output unused here (observe the DCO below)
     .lock_o   (pll_lock[8]),
     .debug_dco_tune_o(pll_tune[8*NumTuneBits +: NumTuneBits]),
-    .dco_clk_o(pll_dco_clk[8])
+    .debug_dco_clk_o(pll_dco_clk[8])
 );
 
 adpll_gearshift_thermometer adpll_gearshift_thermometer (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[9]),
-    .mul_i    (pll_mul[9*EdgeCountWidth +: EdgeCountWidth]),
-    .div_i    (pll_div[9*WindowSizeWidth +: WindowSizeWidth]),
+    .ref_mul_i(pll_mul[9*EdgeCountWidth +: EdgeCountWidth]),
+    .ref_div_i(pll_div[9*WindowSizeWidth +: WindowSizeWidth]),
+    .post_div_i(8'd1),   // edge divider passthrough in this harness
+    .clk_o    (),         // synthesized output unused here (observe the DCO below)
     .lock_o   (pll_lock[9]),
     .debug_dco_tune_o(pll_tune[9*NumTuneBits +: NumTuneBits]),
-    .dco_clk_o(pll_dco_clk[9])
+    .debug_dco_clk_o(pll_dco_clk[9])
 );
 
 adpll_gearshift_muxtap adpll_gearshift_muxtap (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[10]),
-    .mul_i    (pll_mul[10*EdgeCountWidth +: EdgeCountWidth]),
-    .div_i    (pll_div[10*WindowSizeWidth +: WindowSizeWidth]),
+    .ref_mul_i(pll_mul[10*EdgeCountWidth +: EdgeCountWidth]),
+    .ref_div_i(pll_div[10*WindowSizeWidth +: WindowSizeWidth]),
+    .post_div_i(8'd1),   // edge divider passthrough in this harness
+    .clk_o    (),         // synthesized output unused here (observe the DCO below)
     .lock_o   (pll_lock[10]),
     .debug_dco_tune_o(pll_tune[10*NumTuneBits +: NumTuneBits]),
-    .dco_clk_o(pll_dco_clk[10])
+    .debug_dco_clk_o(pll_dco_clk[10])
 );
 
 adpll_gearshift_coarsefine adpll_gearshift_coarsefine (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .enable_i (pll_enable[11]),
-    .mul_i    (pll_mul[11*EdgeCountWidth +: EdgeCountWidth]),
-    .div_i    (pll_div[11*WindowSizeWidth +: WindowSizeWidth]),
+    .ref_mul_i(pll_mul[11*EdgeCountWidth +: EdgeCountWidth]),
+    .ref_div_i(pll_div[11*WindowSizeWidth +: WindowSizeWidth]),
+    .post_div_i(8'd1),   // edge divider passthrough in this harness
+    .clk_o    (),         // synthesized output unused here (observe the DCO below)
     .lock_o   (pll_lock[11]),
     .debug_dco_tune_o(pll_tune[11*NumTuneBits +: NumTuneBits]),
-    .dco_clk_o(pll_dco_clk[11])
+    .debug_dco_clk_o(pll_dco_clk[11])
 );
 
 // Observation mux: route the CSR-selected PLL's DCO clock + lock to the shared observation pins.

@@ -291,6 +291,7 @@ def chip_top_runner():
         sources.append(_adpll / "adpll_freq_counter.sv")
         sources.append(_adpll / "adpll_freq_detector.sv")
         sources.append(_adpll / "adpll_lock_detector.sv")
+        sources.append(_adpll / "adpll_post_divider.sv")
         sources.append(_adpll / "loop_filter/adpll_loop_filter_bangbang.sv")
         sources.append(_adpll / "loop_filter/adpll_loop_filter_pi.sv")
         sources.append(_adpll / "loop_filter/adpll_loop_filter_gearshift.sv")

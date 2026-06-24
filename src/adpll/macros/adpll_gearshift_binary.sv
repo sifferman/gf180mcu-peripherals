@@ -106,7 +106,8 @@ adpll_lock_detector #(
 );
 
 ring_dco_binary #(
-    .NumTuneBits(NumTuneBits)
+    .NumTuneBits(NumTuneBits),
+    .Target("gf180mcu_as_sc_mcu7t3v3")
 ) ring_dco_binary (
     .enable_i(enable_i),
     .tune_i  (tune),

@@ -165,8 +165,7 @@ sim-adpll-array: ## CSR framework: program all 12 PLLs over AXI4-Lite, poll each
 		$(ADPLL_IP)/loop_filter/adpll_loop_filter_bangbang.sv $(ADPLL_IP)/loop_filter/adpll_loop_filter_pi.sv \
 		$(ADPLL_IP)/loop_filter/adpll_loop_filter_gearshift.sv \
 		$(ADPLL_IP)/adpll_freq_detector.sv $(ADPLL_IP)/adpll_freq_counter.sv $(ADPLL_IP)/adpll_lock_detector.sv \
-		$(ADPLL_IP)/dco/ring_dco_binary.sv $(ADPLL_IP)/dco/ring_dco_thermometer.sv \
-		$(ADPLL_IP)/dco/ring_dco_muxtap.sv $(ADPLL_IP)/dco/ring_dco_coarsefine.sv \
+		third_party/adpll/sim/ring_dco_behavioral.sv \
 		cocotb/models/tb_adpll_array.v
 	vvp cocotb/sim_build/tb_adpll_array | grep -E "programmed|LOCKED|PASS|FAIL|obs mux"
 .PHONY: sim-adpll-array

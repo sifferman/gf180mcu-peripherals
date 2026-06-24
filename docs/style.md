@@ -81,8 +81,7 @@ it is recorded here so the same mistake isn't repeated.
 - **A module instantiated once in its scope takes the module's name as its
   instance name** — `adpll_freq_counter adpll_freq_counter (…)`, not `u_meas`.
   Only give a distinct instance name when there are several of the same module
-  in one scope (then name by role: `i_ic`, `i_ic_top`). (Doesn't apply to PDK
-  std-cell primitives, whose type name is impractically long.)
+  in one scope (then name by role: `i_ic`, `i_ic_top`).
 
 ## Anti-patterns to avoid
 

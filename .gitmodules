@@ -1,7 +1,7 @@
 [submodule "third_party/alexforencich_ethernet"]
 	path = third_party/alexforencich_ethernet
 	url = https://github.com/sifferman/alexforencich_ethernet.git
-	branch = rmii
+	branch = waferspace-2026.06.30
 [submodule "third_party/cocotbext-eth"]
 	path = third_party/cocotbext-eth
 	url = https://github.com/sifferman/cocotbext-eth.git

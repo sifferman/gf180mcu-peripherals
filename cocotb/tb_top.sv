@@ -57,6 +57,24 @@ module tb_top (
         .bidir_PAD  (bidir_PAD),
         .analog_PAD (analog_PAD)
     );
+
+    // Open behavioural SDRAM on the SDRAM pads (bidir[8..46]) so a chip-top test can write/read
+    // external SDRAM (0x1000_0000) over Ethernet. Pad map matches src/chip_core.sv: DQ[23:8],
+    // clk[24], cke[25], cs[26], ras[27], cas[28], we[29], dqm[31:30], addr[44:32], ba[46:45].
+`ifndef GL
+    sdram_sim sdram_model (
+        .Clk  (bidir_PAD[24]),
+        .Cke  (bidir_PAD[25]),
+        .Cs_n (bidir_PAD[26]),
+        .Ras_n(bidir_PAD[27]),
+        .Cas_n(bidir_PAD[28]),
+        .We_n (bidir_PAD[29]),
+        .Dqm  (bidir_PAD[31:30]),
+        .Ba   (bidir_PAD[46:45]),
+        .Addr (bidir_PAD[44:32]),
+        .Dq   (bidir_PAD[23:8])
+    );
+`endif
 endmodule
 
 `default_nettype wire

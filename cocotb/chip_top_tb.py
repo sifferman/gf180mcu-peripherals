@@ -254,6 +254,47 @@ async def test_adpll_csr_over_udp(dut):
     log.info("PASS: ADPLL turned on AND locked via CSR over Ethernet (tune=%d)", tune)
 
 
+@cocotb.test()
+async def test_sdram_over_udp(dut):
+    """Write + read back EXTERNAL SDRAM (0x1000_0000) over Ethernet, through the open behavioural
+    SDRAM model on the chip's SDRAM pads -- verifies eth -> AXI-lite -> sdram_wrap -> sdram_axi at
+    the chip top, not just standalone. Allows extra time for the controller's SDRAM power-up/init."""
+    log = dut._log
+    log.setLevel(logging.INFO)
+    phy = RmiiPhy(dut.txd, dut.tx_en, dut.clk, dut.rxd, dut.rx_er, dut.crs_dv)
+
+    dut.rst_n.value = 0
+    for _ in range(20):
+        await RisingEdge(dut.clk)
+    dut.rst_n.value = 1
+    await Timer(3, "us")
+
+    await send_eth(phy, eth(b"\xff" * 6, HOST_MAC, 0x0806,
+                            arp(1, HOST_MAC, HOST_IP, b"\x00" * 6, FPGA_IP)))
+    await with_timeout(phy.tx.recv(), 400, "us")
+
+    addr = 0x10000040   # SDRAM region (address bit 28 set -> sdram_wrap slave)
+    data = bytes((i * 5 + 1) & 0xFF for i in range(32))
+    log.info("WRITE %d bytes to external SDRAM @ %#x (waiting out SDRAM init)", len(data), addr)
+    await udp_write(phy, addr, data)
+    # the write's AXI transaction stalls until the SDRAM controller finishes power-up/init,
+    # so the UDP ack can take much longer than an on-chip-RAM access -> generous timeout.
+    _, _, _, _, ack = await recv_udp(phy, log, timeout_us=5000)
+    amagic, aop, _, aaddr, _ = struct.unpack(HDR, ack[:10])
+    assert (amagic, aop, aaddr) == (MAGIC, OP_WRITE | RESP_BIT, addr), \
+        f"bad SDRAM write ack: {ack[:10].hex()}"
+    log.info("SDRAM WRITE ack OK")
+
+    await udp_read(phy, addr, len(data))
+    _, _, _, _, resp = await recv_udp(phy, log, timeout_us=5000)
+    rmagic, rop, rlen, rraddr, _ = struct.unpack(HDR, resp[:10])
+    assert (rmagic, rop, rraddr) == (MAGIC, OP_READ | RESP_BIT, addr), \
+        f"bad SDRAM read resp: {resp[:10].hex()}"
+    assert resp[10:10 + rlen] == data, \
+        f"SDRAM read-back mismatch:\n got={resp[10:10 + rlen].hex()}\n exp={data.hex()}"
+    log.info("PASS: external SDRAM write + read-back over Ethernet (%d bytes)", rlen)
+
+
 # ---------------------------------------------------------------------------
 # runner
 # ---------------------------------------------------------------------------
@@ -314,6 +355,8 @@ def chip_top_runner():
         sources.append(PROJ / "../src/adpll/adpll_array.sv")
         _sdc = PROJ / "../third_party/ultraembedded_axi_sdram_controller/src_v"
         sources += [_sdc / "sdram_axi.v", _sdc / "sdram_axi_core.v", _sdc / "sdram_axi_pmem.v"]
+        if not gl:
+            sources.append(PROJ / "models/sdram_sim.v")   # open behavioural SDRAM on the SDRAM pads
         # verilog-ethernet: only modules reachable from chip_top
         sources.append(PROJ / "../third_party/alexforencich_ethernet/lib/axis/rtl/arbiter.v")
         sources.append(PROJ / "../third_party/alexforencich_ethernet/lib/axis/rtl/axis_adapter.v")

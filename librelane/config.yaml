@@ -189,7 +189,10 @@ CLOCK_PERIOD: 20 # 50 MHz (experiment; was 40 = 25 MHz)
 # dont_touch inverters. (Forced *adjacency* of the inverters is a separate concern -- OpenROAD honors
 # dbGroup placement fences but LibreLane exposes no knob for it; the robust answer is hardening each
 # DCO as a macro. Here, connectivity-driven global placement keeps the chain compact enough.)
-RSZ_DONT_TOUCH_RX: "ring_dco_"
+# Covers both oscillator structures: ring_dco_* (DCO inverter/mux/nand ring) and adpll_cell_delay
+# (the flash-TDC dlybuff delay line, 186 nets) -- both are calibrated delay chains that must not be
+# rebuffered.
+RSZ_DONT_TOUCH_RX: "ring_dco_|adpll_cell_delay"
 
 # CTS sink clustering. The 12-PLL array adds thousands of reference-domain flops, so the core
 # clock tree is large; OpenROAD's default sink clustering (~20 sinks per leaf buffer) drives each

@@ -115,6 +115,23 @@ if { [llength $dco_cells] > 0 } {
     set_false_path -through $dco_cells
 }
 
+# --- ADPLL flash TDC delay line: a DCO-vs-reference time measurement, not a synchronous path -------
+# The phase-domain TDC (adpll_tdc_flash) launches the DCO clock edge down a (* dont_touch *) chain of
+# dlybuff delay cells (adpll_cell_delay) and latches the whole line on the reference edge -- the
+# edge's position = elapsed DCO time. The delay line is intentionally ~one DCO period long (tens of
+# ns), and the launch (DCO) and capture (reference) clocks are asynchronous, so the line->sampler
+# path is a CDC measurement, not a setup-constrained datapath. Like the ring DCO, STA otherwise
+# charges the full delay-line length to the reference-clock setup budget (this was the real worst
+# path at the SS corner). False-path through the delay cells; the sampler->priority-encoder->phase_o
+# logic does NOT pass through them and is still timed normally. 186 delay cells verified on the
+# routed netlist. (The delay-line nets are also held don't-touch via RSZ_DONT_TOUCH_RX so no buffer
+# splices the calibrated line -- same rationale as the ring.)
+set tdc_cells [get_cells -hierarchical -quiet {*adpll_cell_delay*}]
+if { [llength $tdc_cells] > 0 } {
+    puts "\[INFO] ADPLL: false-pathing [llength $tdc_cells] TDC delay-line cells out of reference timing"
+    set_false_path -through $tdc_cells
+}
+
 if { [info exists ::env(OPENLANE_SDC_IDEAL_CLOCKS)] && $::env(OPENLANE_SDC_IDEAL_CLOCKS) } {
     unset_propagated_clock [all_clocks]
 } else {

@@ -8,14 +8,29 @@
 // PASSes only if all 12 PLLs lock in range and the mux tracks the selection.
 
 `ifndef NUM_PLL_TB
-  `define NUM_PLL_TB 16
+  `define NUM_PLL_TB 12
 `endif
 module tb_adpll_array;
   localparam int unsigned NUM_PLL  = `NUM_PLL_TB;   // must match adpll_array NumPll
   localparam int unsigned NUM_TUNE = 7;
-  localparam int unsigned MUL      = 1707;   // target edges/window (N)
-  localparam int unsigned DIV      = 256;    // window length (M)
   localparam [31:0] OBS_SEL = NUM_PLL * 32'h10;   // observation-select register
+
+  // Per-config control word (matches adpll_array's curated table). FLL configs use mul/div for
+  // F_DCO = mul/div * 25MHz; phase configs put a frequency control word (fcw, Q.6) in the MUL field.
+  //   7-bit FLL rings reach ~167MHz (mul/div=6.67 -> 1707/256); 5-bit rings are faster (~264-385MHz)
+  //   so they target ~300MHz (mul/div=12 -> 3072/256). Phase fcw = (F_DCO/25MHz)*2^6: 427 @167, 768 @300.
+  // 5-bit configs: idx 2,4,6,7,10 ; phase configs: idx 9,10,11.
+  // Behavioural DCO law is fixed (independent of tune bits): binary/therm/coarsefine span ~264-385MHz,
+  // muxtap spans ~124-371MHz. Pick a target that lands each config's tune mid-range:
+  //   - muxtap (any bits) + 7-bit binary/therm/cf: 167MHz (1707/256) -> central tune
+  //   - 5-bit thermometer (idx7): 167MHz is below its floor, so target ~320MHz (3277/256)
+  //   - phase configs (9,10,11): fcw = (F_DCO/25MHz)*2^6 = 427 @167MHz
+  function [31:0] cfg_mul(input integer i);
+    if (i==9 || i==10 || i==11) cfg_mul = 32'd427;   // phase @167MHz (fcw, Q.6)
+    else if (i==7)              cfg_mul = 32'd3277;  // thermometer 5-bit @~320MHz
+    else                        cfg_mul = 32'd1707;  // @167MHz (7-bit, and 5-bit muxtap)
+  endfunction
+  function [31:0] cfg_div(input integer i); cfg_div = 32'd256; endfunction  // phase ignores div
 
   // CSR byte offsets for PLL i
   function [31:0] ctrl_a(input integer i); ctrl_a = i*32'h10 + 32'h0; endfunction
@@ -81,13 +96,13 @@ module tb_adpll_array;
 
     // Program + enable every PLL (each independently, as a host would over Ethernet).
     for (i = 0; i < NUM_PLL; i = i + 1) begin
-      axil_write(mul_a(i), MUL);
-      axil_write(div_a(i), DIV);
-      axil_read (mul_a(i), rd); if (rd !== MUL) begin $display("FAIL: PLL%0d MUL readback %0d", i, rd); $finish; end
-      axil_read (div_a(i), rd); if (rd !== DIV) begin $display("FAIL: PLL%0d DIV readback %0d", i, rd); $finish; end
+      axil_write(mul_a(i), cfg_mul(i));
+      axil_write(div_a(i), cfg_div(i));
+      axil_read (mul_a(i), rd); if (rd !== cfg_mul(i)) begin $display("FAIL: PLL%0d MUL readback %0d", i, rd); $finish; end
+      axil_read (div_a(i), rd); if (rd !== cfg_div(i)) begin $display("FAIL: PLL%0d DIV readback %0d", i, rd); $finish; end
       axil_write(ctrl_a(i), 32'h1);
     end
-    $display("programmed all %0d PLLs: mul=%0d div=%0d enable=1", NUM_PLL, MUL, DIV);
+    $display("programmed all %0d PLLs (per-config mul/div or fcw), enable=1", NUM_PLL);
 
     // Poll every PLL's STATUS until all lock (they run concurrently).
     for (n = 0; n < 200000 && locked != {NUM_PLL{1'b1}}; n = n + 1) begin

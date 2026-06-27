@@ -62,6 +62,14 @@ module adpll_config #(
     parameter int unsigned  LockMinSamplesForLock         = 8,
     parameter int unsigned  LockBandRadius                = 1,
 
+    // Domain=1 selects a PHASE-locked ADPLL (TDC + phase detector) instead of the FLL above. It nulls
+    // phase using a frequency control word (fcw) driven from ref_mul_i (ref_div_i unused); only the
+    // proportionalintegral filter has a phase variant, so FilterSel is ignored when Domain=1.
+    parameter int unsigned  Domain                        = 0,    // 0 = FLL, 1 = phase
+    parameter int unsigned  PhaseTdcPhaseWidth            = 6,
+    parameter int unsigned  PhaseAlphaShift               = 6,
+    parameter int unsigned  PhaseBetaShift                = 11,
+
     // detector / divider sizing (kept at the full-rate widths so the CSR fields are uniform)
     parameter int unsigned  FreqDetectorMaxEdgesPerWindow = (1 << 24) - 1,
     parameter int unsigned  FreqDetectorMaxWindowSize     = (1 << 16) - 1,
@@ -87,6 +95,9 @@ module adpll_config #(
     output logic                                  debug_dco_clk_o
 );
 
+generate
+if (Domain == 0) begin : fll
+
   wire signed [LoopFilterErrorWidth-1:0] loop_filter_error;
   wire                                   loop_filter_error_valid;
   wire [DcoNumTuneBits-1:0]              dco_tune;
@@ -107,8 +118,7 @@ module adpll_config #(
       .valid_o        (loop_filter_error_valid)
   );
 
-  // loop filter: FilterKind selects the implementation; each uses its own gain parameters.
-  generate
+  // loop filter: FilterSel selects the implementation; each uses its own gain parameters.
     if (FilterSel == 0) begin : loop_filter
       adpll_loop_filter_bangbang #(
           .NumTuneBits     (DcoNumTuneBits),
@@ -156,7 +166,6 @@ module adpll_config #(
           .lock_sample_o(lock_detector_sample)
       );
     end
-  endgenerate
 
   adpll_lock_detector #(
       .SampleWidth      (DcoNumTuneBits),
@@ -173,7 +182,6 @@ module adpll_config #(
 
   // DCO: DcoKind selects the ring topology. All are structural gf180 cells (Target) with the ring
   // kept/dont_touch inside the module, so the free-running oscillator survives synthesis.
-  generate
     if (DcoSel == 1) begin : dco
       ring_dco_thermometer #(.NumTuneBits(DcoNumTuneBits), .Target("gf180mcu_as_sc_mcu7t3v3"))
           ring_dco (.enable_i(enable_i), .tune_i(dco_tune), .clk_o(dco_clk));
@@ -188,7 +196,6 @@ module adpll_config #(
       ring_dco_binary #(.NumTuneBits(DcoNumTuneBits), .Target("gf180mcu_as_sc_mcu7t3v3"))
           ring_dco (.enable_i(enable_i), .tune_i(dco_tune), .clk_o(dco_clk));
     end
-  endgenerate
 
   adpll_post_divider #(
       .DivisorWidth(PostDividerDivideWidth)
@@ -202,5 +209,44 @@ module adpll_config #(
 
   assign debug_dco_tune_o = dco_tune;
   assign debug_dco_clk_o  = dco_clk;
+
+end else begin : phase
+  // Phase-locked ADPLL: a complete adpll_phase_proportionalintegral_<dco> (TDC + phase detector +
+  // PI filter + ring DCO + post divider). fcw comes from ref_mul_i (same 24-bit width); ref_div_i
+  // is unused here. Only binary/thermometer/muxtap rings have phase variants.
+  wire _unused_phase_div = &{1'b0, ref_div_i};
+  if (DcoSel == 1) begin : dco
+    adpll_phase_proportionalintegral_thermometer #(
+        .DcoNumTuneBits(DcoNumTuneBits), .TdcPhaseWidth(PhaseTdcPhaseWidth),
+        .PhaseDetectorFcwWidth(FreqDetectorEdgeCountWidth),
+        .LoopFilterAlphaShift(PhaseAlphaShift), .LoopFilterBetaShift(PhaseBetaShift),
+        .LockMinSamplesForLock(LockMinSamplesForLock), .LockBandRadius(LockBandRadius)
+    ) adpll_phase (
+        .clk_i(clk_i), .rst_ni(rst_ni), .enable_i(enable_i), .fcw_i(ref_mul_i),
+        .post_div_i(post_div_i), .clk_o(clk_o), .lock_o(lock_o),
+        .debug_dco_tune_o(debug_dco_tune_o), .debug_dco_clk_o(debug_dco_clk_o));
+  end else if (DcoSel == 2) begin : dco
+    adpll_phase_proportionalintegral_muxtap #(
+        .DcoNumTuneBits(DcoNumTuneBits), .TdcPhaseWidth(PhaseTdcPhaseWidth),
+        .PhaseDetectorFcwWidth(FreqDetectorEdgeCountWidth),
+        .LoopFilterAlphaShift(PhaseAlphaShift), .LoopFilterBetaShift(PhaseBetaShift),
+        .LockMinSamplesForLock(LockMinSamplesForLock), .LockBandRadius(LockBandRadius)
+    ) adpll_phase (
+        .clk_i(clk_i), .rst_ni(rst_ni), .enable_i(enable_i), .fcw_i(ref_mul_i),
+        .post_div_i(post_div_i), .clk_o(clk_o), .lock_o(lock_o),
+        .debug_dco_tune_o(debug_dco_tune_o), .debug_dco_clk_o(debug_dco_clk_o));
+  end else begin : dco   // binary (DcoSel 0; coarsefine has no phase variant)
+    adpll_phase_proportionalintegral_binary #(
+        .DcoNumTuneBits(DcoNumTuneBits), .TdcPhaseWidth(PhaseTdcPhaseWidth),
+        .PhaseDetectorFcwWidth(FreqDetectorEdgeCountWidth),
+        .LoopFilterAlphaShift(PhaseAlphaShift), .LoopFilterBetaShift(PhaseBetaShift),
+        .LockMinSamplesForLock(LockMinSamplesForLock), .LockBandRadius(LockBandRadius)
+    ) adpll_phase (
+        .clk_i(clk_i), .rst_ni(rst_ni), .enable_i(enable_i), .fcw_i(ref_mul_i),
+        .post_div_i(post_div_i), .clk_o(clk_o), .lock_o(lock_o),
+        .debug_dco_tune_o(debug_dco_tune_o), .debug_dco_clk_o(debug_dco_clk_o));
+  end
+end
+endgenerate
 
 endmodule

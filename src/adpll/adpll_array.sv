@@ -47,14 +47,11 @@ module adpll_array #(
     // 24/36/48 overflow detailed placement. PLLs are ordered base-profile-first: indices 0..11 are
     // the 12 (filter x DCO) combos at gain/lock profile 0, then 12..23 add profile 1, etc., so any
     // NumPll keeps a balanced filter/DCO spread and index 0 = bangbang x binary (original CSR offsets).
-    parameter  int unsigned NumPll            = 16,
+    parameter  int unsigned NumPll            = 12,
     parameter  int unsigned MaxEdgesPerWindow = (1 << 24) - 1,
     localparam int unsigned EdgeCountWidth    = $clog2(MaxEdgesPerWindow + 1),
     parameter  int unsigned MaxWindowSize     = (1 << 16) - 1,
     localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1),
-    localparam int unsigned NumFilters        = 3,
-    localparam int unsigned NumDcos           = 4,
-    localparam int unsigned NumProfiles       = 4,    // gain/lock profiles available (cycled by index)
     localparam int unsigned SelWidth          = $clog2(NumPll)
 ) (
     input  wire                  clk_i,
@@ -128,73 +125,66 @@ adpll_array_csr #(
     .obs_sel_o(obs_sel)
 );
 
-// Per-variant loop-filter gains + lock criterion. Each profile is a distinct loop personality; the
-// selected filter inside adpll_config uses only its own knobs (the others are ignored). Profiles
-// cycle every 4 variants, so NumVariants in 1..4 yields all-distinct (filter x DCO x profile) configs.
-// NB: the bang-bang lock sample (the integral) dithers by +-IntegralGain at lock, so a profile's
-// IntegralGain must be <= its LockBandRadius or the lock detector never sees its band satisfied.
-// (profile 3 uses gain 2, and profile 3's band is 2 -- see lock_band_radius.)
-function automatic int unsigned bangbang_integral_gain(int unsigned v);
-    case (v % 4) 0: return 1; 1: return 1; 2: return 1; default: return 2; endcase
+// Curated set of NumPll genuinely-distinct ADPLLs -- each a different design-point tradeoff, so the
+// chip characterizes the space rather than replicating one design. Index 0 is FLL bang-bang x binary
+// (original CSR offsets, keeps the Ethernet UDP test valid). Per-index rationale (tradeoff captured):
+//   0  FLL bb     x binary      x7  fast lock, widest range, non-monotonic ring (lock-risk)
+//   1  FLL pi     x thermometer x7  most reliable: monotonic ring + low-jitter PI, larger area
+//   2  FLL gear   x muxtap      x5  fastest acquire, steep ring, small/high-freq (5-bit)
+//   3  FLL pi     x coarsefine  x7  wide range + fine resolution (two-scale ring)
+//   4  FLL bb     x muxtap      x5  smallest area, highest freq, coarse (5-bit)
+//   5  FLL gear   x binary      x7  fast acquire over the wide non-monotonic range
+//   6  FLL pi     x muxtap      x5  low jitter, steep ring, small
+//   7  FLL bb     x thermometer x5  monotonic + fast + small
+//   8  FLL gear   x coarsefine  x7  fast acquire, wide + fine
+//   9  PHASE pi   x thermometer x7  true phase lock, lowest jitter, reliable ring
+//   10 PHASE pi   x muxtap      x5  phase lock, small/high-freq
+//   11 PHASE pi   x binary      x7  phase lock over the wide range
+// domain 0=FLL(mul/div) 1=phase(fcw); filter 0=bb 1=pi 2=gear; dco 0=bin 1=therm 2=mux 3=cf;
+// tune = DCO tune bits (zero-extended to the uniform CSR field). Loop gains use adpll_config's
+// proven defaults; diversity here is the filter/DCO/domain/resolution axes.
+// The table is expressed as constant case-functions (iverilog has no unpacked-array parameters).
+function automatic int unsigned cfg_domain(int unsigned i);            // 0=FLL 1=phase
+    case (i) 9, 10, 11: return 1; default: return 0; endcase
 endfunction
-function automatic int unsigned bangbang_proportional_gain(int unsigned v);
-    case (v % 4) 0: return 1; 1: return 2; 2: return 1; default: return 2; endcase
+function automatic int unsigned cfg_filter(int unsigned i);            // 0=bb 1=pi 2=gear
+    case (i) 0, 4, 7: return 0; 2, 5, 8: return 2; default: return 1; endcase
 endfunction
-function automatic int unsigned pi_alpha_shift(int unsigned v);
-    case (v % 4) 0: return 10; 1: return 8; 2: return 12; default: return 9; endcase
+function automatic int unsigned cfg_dco(int unsigned i);               // 0=bin 1=therm 2=mux 3=cf
+    case (i) 0, 5, 11: return 0; 1, 7, 9: return 1; 2, 4, 6, 10: return 2; default: return 3; endcase
 endfunction
-function automatic int unsigned pi_beta_shift(int unsigned v);
-    case (v % 4) 0: return 8; 1: return 6; 2: return 10; default: return 7; endcase
-endfunction
-function automatic int unsigned gearshift_max_gear(int unsigned v);
-    case (v % 4) 0: return 2; 1: return 3; 2: return 2; default: return 3; endcase
-endfunction
-function automatic int unsigned gearshift_upshift_after(int unsigned v);
-    case (v % 4) 0: return 4; 1: return 4; 2: return 8; default: return 8; endcase
-endfunction
-function automatic int unsigned lock_band_radius(int unsigned v);
-    case (v % 4) 0: return 1; 1: return 2; 2: return 1; default: return 2; endcase
-endfunction
-function automatic int unsigned lock_min_samples(int unsigned v);
-    case (v % 4) 0: return 8; 1: return 8; 2: return 16; default: return 4; endcase
+function automatic int unsigned cfg_tune(int unsigned i);              // DCO tune bits
+    case (i) 2, 4, 6, 7, 10: return 5; default: return 7; endcase
 endfunction
 
-// One adpll_config per PLL index. Index maps base-profile-first: idx % 12 picks the (filter, DCO)
-// combo and idx / 12 picks the gain/lock profile, so the first 12 indices are the 12 combos at
-// profile 0 (index 0 = bangbang x binary x profile 0 -> original CSR offsets), and higher NumPll add
-// further profiles while keeping a balanced filter/DCO spread.
 generate
     for (genvar idx_GEN = 0; idx_GEN < NumPll; idx_GEN++) begin : pll
-        localparam int unsigned FilterDco = idx_GEN % (NumFilters * NumDcos);
-        localparam int unsigned Profile   = idx_GEN / (NumFilters * NumDcos);
-        localparam int unsigned FilterSel = FilterDco / NumDcos;
-        localparam int unsigned DcoSel    = FilterDco % NumDcos;
+        localparam int unsigned Dom  = cfg_domain(idx_GEN);
+        localparam int unsigned Fsel = cfg_filter(idx_GEN);
+        localparam int unsigned Dsel = cfg_dco(idx_GEN);
+        localparam int unsigned Tb   = cfg_tune(idx_GEN);
+        wire [Tb-1:0] tune_bits;
         adpll_config #(
-            .FilterSel                     (FilterSel),
-            .DcoSel                        (DcoSel),
-            .DcoNumTuneBits                (NumTuneBits),
-            .BangbangIntegralGain          (bangbang_integral_gain(Profile)),
-            .BangbangProportionalGain      (bangbang_proportional_gain(Profile)),
-            .ProportionalIntegralAlphaShift(pi_alpha_shift(Profile)),
-            .ProportionalIntegralBetaShift (pi_beta_shift(Profile)),
-            .GearshiftMaxGear              (gearshift_max_gear(Profile)),
-            .GearshiftUpshiftAfter         (gearshift_upshift_after(Profile)),
-            .LockMinSamplesForLock         (lock_min_samples(Profile)),
-            .LockBandRadius                (lock_band_radius(Profile)),
-            .FreqDetectorMaxEdgesPerWindow (MaxEdgesPerWindow),
-            .FreqDetectorMaxWindowSize     (MaxWindowSize)
+            .Domain                       (Dom),
+            .FilterSel                    (Fsel),
+            .DcoSel                       (Dsel),
+            .DcoNumTuneBits               (Tb),
+            .FreqDetectorMaxEdgesPerWindow(MaxEdgesPerWindow),
+            .FreqDetectorMaxWindowSize    (MaxWindowSize)
         ) adpll_config (
             .clk_i           (clk_i),
             .rst_ni          (rst_ni),
             .enable_i        (pll_enable[idx_GEN]),
-            .ref_mul_i       (pll_mul[idx_GEN*EdgeCountWidth +: EdgeCountWidth]),
+            .ref_mul_i       (pll_mul[idx_GEN*EdgeCountWidth +: EdgeCountWidth]),  // = fcw if phase
             .ref_div_i       (pll_div[idx_GEN*WindowSizeWidth +: WindowSizeWidth]),
             .post_div_i      (8'd1),
             .clk_o           (),   // synthesized /K output unused; observe the DCO below
             .lock_o          (pll_lock[idx_GEN]),
-            .debug_dco_tune_o(pll_tune[idx_GEN*NumTuneBits +: NumTuneBits]),
+            .debug_dco_tune_o(tune_bits),
             .debug_dco_clk_o (pll_dco_clk[idx_GEN])
         );
+        // zero-extend this config's tune (Tb bits) into the CSR's uniform NumTuneBits field
+        assign pll_tune[idx_GEN*NumTuneBits +: NumTuneBits] = {{(NumTuneBits-Tb){1'b0}}, tune_bits};
     end
 endgenerate
 

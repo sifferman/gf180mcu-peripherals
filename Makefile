@@ -161,7 +161,7 @@ sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr: ## AD
 sim-adpll-array: ## CSR framework: program every distinct PLL over AXI4-Lite, poll each for lock, test obs mux
 	@mkdir -p cocotb/sim_build
 	iverilog -g2012 -c <(printf '+timescale+1ns/1ps\n') -o cocotb/sim_build/tb_adpll_array \
-		src/csr/adpll_array_csr.sv src/adpll_array.sv src/adpll_config.sv \
+		src/adpll/adpll_array_csr.sv src/adpll/adpll_array.sv src/adpll/adpll_config.sv \
 		$(ADPLL_IP)/loop_filter/adpll_loop_filter_bangbang.sv \
 		$(ADPLL_IP)/loop_filter/adpll_loop_filter_proportionalintegral.sv \
 		$(ADPLL_IP)/loop_filter/adpll_loop_filter_gearshift.sv \

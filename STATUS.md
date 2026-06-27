@@ -206,3 +206,34 @@ Living tracker. See `questions.md` for decisions/risks and
   repair_design (step 31) buffers it. Confirmed benign: ALL 4 prior completed runs sign off at
   setup+hold WNS=0 / DRC=0 / LVS=0 across all 9 corners, so no SDC reset constraint is needed.
 - Monitor bzpy9mioh -> notifies on this run's own final/ (DRC/LVS/antenna sign-off) or failure.
+
+## 2026-06-27 (cont) — upstream template merge + timing/SDC overhaul (toward a clean 50 MHz GDS)
+- UPSTREAM: wafer-space template advanced 3 commits past our fork (baseline a4bca2f); entire delta =
+  PDK_COMMIT 019cf7a3->140b0494 (Makefile) + librelane 3131cc55->f18a07a (flake.lock). Applied; new
+  devshell builds clean (LibreLane v3.1.0.dev2, yosys-slang overlay OK). All other template features
+  (3v3, shuttle ID/marker/logo IP, padring, CI) were already present at our fork point.
+- TIMING ROOT CAUSE (25 MHz run RUN_..12-44-09): the only setup violators were FALSE PATHS through the
+  self-timed ADPLL structures, not real logic:
+    * ring DCO: tune-reg -> dont_touch inverter/mux ring -> clk_PAD flop (worst at TT corner)
+    * flash TDC: dco_clk -> dont_touch dlybuff delay line -> reference flop (worst -6.7 ns at SS)
+  Worst REAL path had +5.73 ns slack at 25 MHz. Fixes (grounded in OpenROAD/OpenSTA source):
+    * chip_top.sdc set_false_path -through the 738 ring-DCO cells + 186 TDC delay cells (patterns
+      verified on the routed netlist). Sampler->encoder->phase_o logic still timed normally.
+    * RSZ_DONT_TOUCH_RX disabled ("^$"): net-level dont_touch caused repair_design RSZ-3006 (the
+      oscillator's high-fanout output needs buffering). Cells stay protected by RTL (* dont_touch *).
+      Proper buffer-free-loop fix = RTL output-buffer decoupling (follow-up).
+- I/O DELAYS: replaced uniform generic delays with per-interface datasheet values (all 7 port groups
+  verified on netlist): RMII RX in 14.0/3.0, RMII TX out 4.0/-1.5 (LAN8720A REF_CLK-In, p72);
+  SDRAM cmd/addr/wrDQ out 1.5/-0.8, read DQ in 5.0/3.0 (W9825G6KH -6 CL3, p15); LEDs/strap false_path;
+  SD relaxed. First-order system-synchronous ref'd to clk_PAD (1:1 source of both forwarded clocks).
+- CLOCK: CLOCK_PERIOD 40->20 (50 MHz). RMII *requires* 50 MHz REF_CLK for 100 Mbps, so this is needed
+  for spec-compliant Ethernet, not just nice-to-have. RMII TX uses the existing negedge launch
+  (delay_to_negedge, 3 di-bits) -- standard robust ASIC source-synchronous technique.
+- DECISION (negedge vs posedge): user prefers all-posedge. Posedge-only is feasible in ASIC (OpenROAD
+  can balance data-vs-forwarded-clock skew) but requires generated clocks on the forwarded outputs to
+  be "strict enough" -- adds CTS/sim risk. Prioritized the firm "passing GDS asap" goal: deliver via
+  the proven negedge path first (RUN_..14-48-36, 50 MHz), then pursue posedge+generated-clocks as a
+  parallel refinement. Core-logic 50 MHz closure (SDRAM/AXI) is identical either way.
+- RUNS: 25 MHz fallback RUN_..12-44-09 = clean GDS imminent (its DCO/TDC "violations" are the known
+  false paths; functionally fine). 50 MHz v2 RUN_..14-48-36 running with all the above. The signoff
+  WNS (step 54) of v2 is the real 50 MHz answer. Monitor bzu27zkm4 tracks it.

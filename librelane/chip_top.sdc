@@ -96,6 +96,25 @@ set_timing_derate -late [expr 1+[expr $::env(TIME_DERATING_CONSTRAINT) / 100]]
 # handled in RTL (Gray-coded). It is NOT routed to a pad (the analog pads can't carry routed
 # digital signals); observability is via the CSR STATUS register over Ethernet.
 
+# --- ADPLL ring-DCO oscillators: not synchronous datapaths ---------------------------------------
+# Each ring DCO is a self-timed oscillator: a (* dont_touch *) chain of inv/mux/nand cells whose
+# combinational delay IS the oscillation period (tens of ns by construction). The only clk_PAD
+# connections are (a) the tune bits, which are quasi-static -- written once over the CSR, then held
+# during lock -- and (b) the ring output, consumed by the DCO's own free-running frequency counter,
+# NOT captured on clk_PAD in a single cycle. Left unconstrained, OpenSTA traces tune_reg -> ring
+# inverter chain -> a clk_PAD flop and charges the full oscillator delay to the clk_PAD setup budget,
+# producing a large false violation that masks the true core critical path. Exclude every path
+# through the ring cells from clk_PAD timing. (OpenSTA already auto-breaks the ring's combinational
+# loop; `set_dynamic_loop_breaking` would auto-generate the loop exceptions too, but the explicit
+# -through is targeted and deterministic -- it does not depend on which arc STA picks to break.)
+# Pattern verified against the routed netlist: 738 ring-DCO cells across the 10 PLLs. Guarded so a
+# build without the ADPLL array is unaffected.
+set dco_cells [get_cells -hierarchical -quiet {*ring_dco_*}]
+if { [llength $dco_cells] > 0 } {
+    puts "\[INFO] ADPLL: false-pathing [llength $dco_cells] ring-DCO cells out of clk_PAD timing"
+    set_false_path -through $dco_cells
+}
+
 if { [info exists ::env(OPENLANE_SDC_IDEAL_CLOCKS)] && $::env(OPENLANE_SDC_IDEAL_CLOCKS) } {
     unset_propagated_clock [all_clocks]
 } else {

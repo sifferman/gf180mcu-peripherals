@@ -179,7 +179,17 @@ IGNORE_DISCONNECTED_MODULES:
 # Clock
 CLOCK_PORT: clk_PAD
 CLOCK_NET: clk_pad/Y
-CLOCK_PERIOD: 40 # 25 MHz
+CLOCK_PERIOD: 20 # 50 MHz (experiment; was 40 = 25 MHz)
+
+# ADPLL ring-DCO nets: keep the resizer's hands off the oscillator. Resizer::dontTouch(net) only
+# returns true when the NET itself is do-not-touch -- the (* dont_touch *) on the inv/mux CELLS does
+# NOT propagate to the nets between them (OpenROAD rsz/Resizer.cc), so without this repair_design can
+# splice a buffer into the ring and change/ruin the oscillation. This regex marks every ring net
+# (861 of them, verified on the routed netlist) do-not-touch so no buffer is inserted between the
+# dont_touch inverters. (Forced *adjacency* of the inverters is a separate concern -- OpenROAD honors
+# dbGroup placement fences but LibreLane exposes no knob for it; the robust answer is hardening each
+# DCO as a macro. Here, connectivity-driven global placement keeps the chain compact enough.)
+RSZ_DONT_TOUCH_RX: "ring_dco_"
 
 # CTS sink clustering. The 12-PLL array adds thousands of reference-domain flops, so the core
 # clock tree is large; OpenROAD's default sink clustering (~20 sinks per leaf buffer) drives each

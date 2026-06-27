@@ -293,14 +293,13 @@ def chip_top_runner():
         sources.append(_adpll / "adpll_lock_detector.sv")
         sources.append(_adpll / "adpll_post_divider.sv")
         sources.append(_adpll / "loop_filter/adpll_loop_filter_bangbang.sv")
-        sources.append(_adpll / "loop_filter/adpll_loop_filter_pi.sv")
+        sources.append(_adpll / "loop_filter/adpll_loop_filter_proportionalintegral.sv")
         sources.append(_adpll / "loop_filter/adpll_loop_filter_gearshift.sv")
         sources.append(PROJ / "../third_party/adpll/sim/ring_dco_behavioral.sv")
+        # one parameterized config stamped out by adpll_array (replaces the per-type wrappers)
+        sources.append(PROJ / "../src/adpll_config.sv")
         sources.append(PROJ / "../src/csr/adpll_array_csr.sv")
         sources.append(PROJ / "../src/adpll_array.sv")
-        import glob as _glob
-        for _m in sorted(_glob.glob(str(PROJ / "../third_party/adpll/rtl/adpll/adpll_*.sv"))):
-            sources.append(Path(_m))
         _sdc = PROJ / "../third_party/ultraembedded_axi_sdram_controller/src_v"
         sources += [_sdc / "sdram_axi.v", _sdc / "sdram_axi_core.v", _sdc / "sdram_axi_pmem.v"]
         # verilog-ethernet: only modules reachable from chip_top

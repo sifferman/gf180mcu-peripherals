@@ -36,3 +36,13 @@ OPEN QUESTIONS FOR YOU (non-blocking; using my judgement meanwhile):
 - Is 48 distinct configs (or whatever hits ~60% util) the right "ton", or do you want me to push
   toward more via tune-bit/ring-length variants (needs CSR tune-width = max, zero-extend per PLL)?
 - Want the phase-domain ADPLLs on-chip too (separate CSR group)?
+
+## 2026-06-27 (cont) harden running + gain verification
+- 48-PLL harden RUN_2026-06-27_01-26-59: synth OK, FLOORPLAN UTIL = 0.600 (60%, in your 50-70% band),
+  chip area 7.61M um2. Now in placement (~step 27). baz7tjvn1 notifies on completion. Letting it run
+  to GDS; gains do NOT change the routing-critical rings, so its DRC/LVS validates the design.
+- VERIFIED variant gains all lock: gearshift MaxGear=3 (variants 1,3) does NOT rail at the array's
+  167MHz operating point (tune~19/89) on any of the 4 DCOs -- the railing was specific to the cosim's
+  300MHz steep-low-code region. So NO gain change needed; the 48 configs are all expected to lock.
+- 48-PLL behavioral sim is slow in vvp (48 high-freq rings) -- non-critical (12-PLL + each config type
+  verified individually). Running in background for confirmation only.

@@ -132,3 +132,20 @@ Living tracker. See `questions.md` for decisions/risks and
 - **Upstream fork branches pushed**: sifferman/yosys-slang @ fix-evalcontext-step-accumulation
   (reset step budget per eval) and sifferman/yosys @ lfsr-constfunc-slowness-investigation
   (root-cause + repro for the default-frontend slowness). Details in questions.md.
+
+## 2026-06-27 — chip-fill ADPLL array for tapeout (autonomous, multi-day)
+- Goal: fill spare die with many DISTINCT ADPLLs (CSR-selectable) + clean GDS in ~4 days.
+- src/adpll_config.sv (parameterized filter+DCO+gains) + src/adpll_array.sv rewritten as a nested
+  filter(3)xDCO(4)xvariant(NumVariants) generate -> 12*NumVariants distinct PLLs. NumVariants=4 => 48.
+- Submodule reconciled to 82d26c2 (pi->proportionalintegral + gearshift fix). config.yaml/Makefile/tb
+  updated; 12 fixed wrappers dropped for adpll_config. Committed 14e2941 (local only).
+- VERIFIED: sim-adpll-array @ NumVariants=1 (12 base configs) all lock + obs mux OK. 48-PLL sim slow
+  in vvp (running). 48-PLL harden RUNNING (RUN_2026-06-27_01-26-59), est ~57% util; monitoring
+  floorplan util to confirm 50-70% before the ~3h flow finishes. PDK_ROOT=/home/esifferm/Utils/ciel-pdks.
+
+## 2026-06-27 (cont) — 48-PLL harden hit congestion; iterating to 36
+- 48-PLL (60% util) FAILED detailed placement (DPL-0036): routing congestion ~1.01, post-repair
+  buffers over-filled. Per guidance, reduced NumVariants 4->3 = 36 PLLs (~56% util).
+- Sim found 4 non-locking configs (bangbang IntegralGain=2 + band=1 + 16-sample lock: the integral
+  dithers +-2 > band 1). Fixed: bangbang gain 1 unless band>=2 (profile 3 keeps gain2 w/ band2).
+- Re-running: 36-PLL sim + 36-PLL harden (RUN newest). Monitor b0k80l9vw catches placement gate.

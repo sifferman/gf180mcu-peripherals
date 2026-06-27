@@ -36,18 +36,18 @@
 // PLL still runs and is read back over the CSR). PLL 0 is bangbang x binary at the default profile,
 // keeping the original single-PLL CSR offsets valid.
 //
-// NumVariants scales the count (NumPll = 12 * NumVariants) to fill available area; the tune-code width
-// is uniform across all configs so the CSR's tune readback field is one fixed width.
+// NumPll selects how many of the curated configs to instantiate to fill available area; the tune-code
+// width is uniform across all configs so the CSR's tune readback field is one fixed width.
 
 module adpll_array #(
     parameter  int unsigned AddrWidth         = 32,
     parameter  int unsigned NumTuneBits       = 7,
     // Number of distinct PLLs to instantiate. The dont_touch ring DCOs are routing-congestion-heavy
-    // (all 5 metals used), so the placeable ceiling on this 1x1 die is ~12-16 PLLs (~48% util);
-    // 24/36/48 overflow detailed placement. PLLs are ordered base-profile-first: indices 0..11 are
-    // the 12 (filter x DCO) combos at gain/lock profile 0, then 12..23 add profile 1, etc., so any
-    // NumPll keeps a balanced filter/DCO spread and index 0 = bangbang x binary (original CSR offsets).
-    parameter  int unsigned NumPll            = 12,
+    // (all 5 metals used): 12 PLLs alone routed clean at ~48% util, but the full chip (Ethernet +
+    // SDRAM + SD card + 12 PLLs) overflowed detailed-placement legalization by a handful of resizer
+    // buffers, so the fill is trimmed to 10 (~46% util) to make room. Index 0 = bangbang x binary
+    // (keeps the original single-PLL CSR offsets and the Ethernet UDP test valid).
+    parameter  int unsigned NumPll            = 10,
     parameter  int unsigned MaxEdgesPerWindow = (1 << 24) - 1,
     localparam int unsigned EdgeCountWidth    = $clog2(MaxEdgesPerWindow + 1),
     parameter  int unsigned MaxWindowSize     = (1 << 16) - 1,
@@ -127,34 +127,37 @@ adpll_array_csr #(
 
 // Curated set of NumPll genuinely-distinct ADPLLs -- each a different design-point tradeoff, so the
 // chip characterizes the space rather than replicating one design. Index 0 is FLL bang-bang x binary
-// (original CSR offsets, keeps the Ethernet UDP test valid). Per-index rationale (tradeoff captured):
+// (original CSR offsets, keeps the Ethernet UDP test valid). The set is sized to fit the 1x1 die
+// alongside the Ethernet/SDRAM/SD-card datapath: 10 configs that still span all 3 loop filters, all 4
+// DCOs, both domains (FLL/phase) and both tune-code widths. (12 alone routed clean at ~48% util, but
+// adding the required SD-card block pushed detailed-placement legalization over the cliff, so the
+// discretionary PLL fill is trimmed 12->10 to make room -- see questions.md.)
+// Per-index rationale (tradeoff captured):
 //   0  FLL bb     x binary      x7  fast lock, widest range, non-monotonic ring (lock-risk)
 //   1  FLL pi     x thermometer x7  most reliable: monotonic ring + low-jitter PI, larger area
 //   2  FLL gear   x muxtap      x5  fastest acquire, steep ring, small/high-freq (5-bit)
-//   3  FLL pi     x coarsefine  x7  wide range + fine resolution (two-scale ring)
-//   4  FLL bb     x muxtap      x5  smallest area, highest freq, coarse (5-bit)
-//   5  FLL gear   x binary      x7  fast acquire over the wide non-monotonic range
-//   6  FLL pi     x muxtap      x5  low jitter, steep ring, small
-//   7  FLL bb     x thermometer x5  monotonic + fast + small
-//   8  FLL gear   x coarsefine  x7  fast acquire, wide + fine
-//   9  PHASE pi   x thermometer x7  true phase lock, lowest jitter, reliable ring
-//   10 PHASE pi   x muxtap      x5  phase lock, small/high-freq
-//   11 PHASE pi   x binary      x7  phase lock over the wide range
+//   3  FLL bb     x muxtap      x5  smallest area, highest freq, coarse (5-bit)
+//   4  FLL pi     x muxtap      x5  low jitter, steep ring, small
+//   5  FLL bb     x thermometer x5  monotonic + fast + small
+//   6  FLL gear   x coarsefine  x7  fast acquire, wide + fine (two-scale ring)
+//   7  PHASE pi   x thermometer x7  true phase lock, lowest jitter, reliable ring
+//   8  PHASE pi   x muxtap      x5  phase lock, small/high-freq
+//   9  PHASE pi   x binary      x7  phase lock over the wide range
 // domain 0=FLL(mul/div) 1=phase(fcw); filter 0=bb 1=pi 2=gear; dco 0=bin 1=therm 2=mux 3=cf;
 // tune = DCO tune bits (zero-extended to the uniform CSR field). Loop gains use adpll_config's
 // proven defaults; diversity here is the filter/DCO/domain/resolution axes.
 // The table is expressed as constant case-functions (iverilog has no unpacked-array parameters).
 function automatic int unsigned cfg_domain(int unsigned i);            // 0=FLL 1=phase
-    case (i) 9, 10, 11: return 1; default: return 0; endcase
+    case (i) 7, 8, 9: return 1; default: return 0; endcase
 endfunction
 function automatic int unsigned cfg_filter(int unsigned i);            // 0=bb 1=pi 2=gear
-    case (i) 0, 4, 7: return 0; 2, 5, 8: return 2; default: return 1; endcase
+    case (i) 0, 3, 5: return 0; 2, 6: return 2; default: return 1; endcase
 endfunction
 function automatic int unsigned cfg_dco(int unsigned i);               // 0=bin 1=therm 2=mux 3=cf
-    case (i) 0, 5, 11: return 0; 1, 7, 9: return 1; 2, 4, 6, 10: return 2; default: return 3; endcase
+    case (i) 0, 9: return 0; 1, 5, 7: return 1; 2, 3, 4, 8: return 2; default: return 3; endcase
 endfunction
 function automatic int unsigned cfg_tune(int unsigned i);              // DCO tune bits
-    case (i) 2, 4, 6, 7, 10: return 5; default: return 7; endcase
+    case (i) 2, 3, 4, 5, 8: return 5; default: return 7; endcase
 endfunction
 
 generate

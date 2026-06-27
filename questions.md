@@ -46,3 +46,62 @@ OPEN QUESTIONS FOR YOU (non-blocking; using my judgement meanwhile):
   300MHz steep-low-code region. So NO gain change needed; the 48 configs are all expected to lock.
 - 48-PLL behavioral sim is slow in vvp (48 high-freq rings) -- non-critical (12-PLL + each config type
   verified individually). Running in background for confirmation only.
+
+## 2026-06-27 — ROUTING-CONGESTION WALL limits PLL count (DECISION NEEDED)
+FINDING: the dont_touch ring DCOs are routing-congestion-heavy. Detailed-placement results on the
+1x1 die (signal routing already uses all 5 metals, Metal1-5):
+  - 12 PLLs (~47% util): PLACES clean (the 2026-06-23 sign-off).
+  - 24 (51%), 36 (56%), 48 (60%): ALL fail detailed placement (DPL-0036), routing congestion ~1.01,
+    placer "minimum feasible density" ~0.46.
+So the placeable ceiling is ~12-16 PLLs (~48% util) -- a ROUTING limit, not cell area. The ~49%
+"empty" space you saw can't be filled with these rings without relieving routing congestion.
+
+ACTION (best judgement, per "decrease util on congestion"): delivering NumPll=16 (~48.5% util, just
+under your 50% floor which you said is OK). 16/16 lock in sim; chip UDP gold-path passes. Hardening
+now (bhl2euwlc); if 16 overflows placement I fall back to the proven 12. Clean GDS either way.
+
+TO REACH YOUR 36-48 "ton" (50-70% util), options -- YOUR CALL (each has a tradeoff I didn't want to
+take unilaterally):
+  (a) Loosen the PDN straps (wider pitch) to free Metal3/4 for signal routing -> fits more PLLs.
+      Tradeoff: higher IR drop (and IR-drop signoff is currently skipped -- no VSRC_LOC_FILES), so
+      this needs care for a real tapeout. Librelane change (I'd consult OpenROAD PDN source first).
+  (b) Smaller DCO rings (NumTuneBits 7->5) -> ~4x less ring routing -> many more fit. Tradeoff:
+      narrower freq range (5-bit ring ~264-385MHz in the behavioural model; the 167MHz test target
+      isn't reachable, so the on-chip mul/div would target a higher freq). Changes the DCO design pt.
+  (c) Accept ~16 PLLs (clean, low-risk) -- what I'm delivering now.
+RECOMMENDATION: ship (c) as the safe tapeout GDS; if you want the bigger "ton", I'd do (b) smaller
+rings (no power-integrity risk, unlike (a)) -- tell me and I'll characterize + scale it.
+
+## 2026-06-27 (cont) — routable wall is ~12-14 PLLs; delivering 12
+- 16 PLLs PLACED (got past detailed placement at ~48.5% util) but FAILED GLOBAL ROUTING
+  (GRT-0183 heap underflow / congestion). So the place-AND-route-clean ceiling is ~12-14 PLLs,
+  tighter than the placement ceiling. 12 is the proven clean point (2026-06-23 sign-off).
+- DELIVERING NumPll=12 (current submodule + adpll_config + all-locking gains): hardening now
+  (b6am00mqb) -> the reliable tapeout GDS. This is what fits cleanly with the dont_touch rings.
+- To exceed ~12 toward your "ton" still needs the logged tradeoffs (smaller rings = best, no power
+  risk). NEXT after the 12-GDS is secured: try NumTuneBits=5 rings (~4x less ring routing) at a
+  ~300MHz operating point (5-bit range ~264-385MHz; 167MHz unreachable so retarget mul/div), which
+  could let many more route. Will characterize locking then scale the count.
+
+## 2026-06-27 (cont) — 5-bit ring scale-up CONFIRMED viable
+- Behavioral check: adpll_config with DcoNumTuneBits=5 LOCKS at ~300MHz (mul=96/div=8) for
+  bb-binary(tune21), pi-muxtap(0), gearshift-muxtap(4), bb-coarsefine(21). 5-bit ring range
+  ~264-385MHz, so the on-chip mul/div targets ~300MHz (vs 167MHz for 7-bit).
+- PLAN after the 12-PLL GDS (b6am00mqb) completes: switch the array to NumTuneBits=5 (rings ~4x
+  smaller -> much less routing congestion) + shrink the oversized 24-bit freq detector, then harden
+  at a HIGH NumPll (target 36-48) to fit your "ton" cleanly. Tradeoff: 5-bit = 32 tune codes
+  (coarser per-PLL resolution) in exchange for many more PLLs. No power-integrity risk (unlike PDN
+  loosening). Will verify all lock at scale + drive to clean DRC/LVS.
+
+## 2026-06-27 (cont) — full-chip harden failed legalization; trimmed PLL fill 12->10
+DECISION (autonomous, per your "decrease utilization when congested" guidance): the full chip
+(eth + SDRAM + SD card + 12 ADPLLs) FAILED detailed-placement legalization (DPL-0036) at
+repair_design -- repair inserted 69443 buffers for the high-fanout nets and the legalizer could not
+place 14 of them. The curated-12 WITHOUT the SD card routed clean (0 DRC violations, magic-drc clean,
+reached final klayout-drc before you killed it), so the SD block (a REQUIRED peripheral) tipped the
+design ~2000 buffers / +0.026 util over the legalization cliff. The ADPLLs are the discretionary
+"fill," so I trimmed them 12->10 to make room, dropping the two 7-bit FLL configs pi x coarsefine and
+gear x binary. The remaining 10 still span ALL 3 loop filters, ALL 4 DCOs, both domains (7 FLL + 3
+phase) and both tune widths, and index 0 (bb x binary, the Ethernet-UDP CSR test baseline) is
+unchanged. Validated: make sim-adpll-array -> 10/10 lock in range + obs mux OK.
+If 10+SD still overflows, next lever is 12->9 or shrink a 7-bit FLL config to 5-bit.

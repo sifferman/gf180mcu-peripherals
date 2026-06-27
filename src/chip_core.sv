@@ -353,7 +353,7 @@ sdram_wrap i_sdram (
 );
 
 // On-chip ADPLL array (observe-only): many genuinely-distinct loop-filter x DCO x gain/lock adplls
-// (adpll_array, 12 * NumVariants of them, filling the spare die as a characterization vehicle), each
+// (adpll_array, NumPll=10 of them, filling the spare die as a characterization vehicle), each
 // programmed independently over Ethernet through adpll_array_csr at 0x2000_0000 (enable/mul/div) and
 // read back (lock/tune). It does NOT clock the core. Observability at the chip level is the per-PLL
 // CSR STATUS over Ethernet: the gf180 analog pads (asig_5p0) cannot carry routed digital signals

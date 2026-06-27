@@ -189,10 +189,17 @@ CLOCK_PERIOD: 20 # 50 MHz (experiment; was 40 = 25 MHz)
 # dont_touch inverters. (Forced *adjacency* of the inverters is a separate concern -- OpenROAD honors
 # dbGroup placement fences but LibreLane exposes no knob for it; the robust answer is hardening each
 # DCO as a macro. Here, connectivity-driven global placement keeps the chain compact enough.)
-# Covers both oscillator structures: ring_dco_* (DCO inverter/mux/nand ring) and adpll_cell_delay
-# (the flash-TDC dlybuff delay line, 186 nets) -- both are calibrated delay chains that must not be
-# rebuffered.
-RSZ_DONT_TOUCH_RX: "ring_dco_|adpll_cell_delay"
+#
+# DISABLED ("^$" = match nothing): net-level dont_touch on the oscillator nets makes repair_design
+# ERROR (RSZ-3006 "Failed to insert buffer ... is dont_touch") -- the ring/TDC OUTPUT node is high
+# fanout (feedback + TDC dco_clk_i + freq counter) and legitimately needs buffering for max-cap/
+# transition, which dont_touch forbids. The cells stay protected by the RTL (* dont_touch *) (not
+# resized/removed) and the SDC false-paths keep these chains out of timing; repair_design is allowed
+# to buffer the high-fanout distribution net. To get a TRULY buffer-free oscillator loop (so the
+# inverter-to-inverter nets can be dont_touch without the RSZ-3006), the right fix is an RTL change:
+# add a (* dont_touch *) output buffer in ring_dco/adpll_tdc_flash that decouples the low-fanout
+# feedback loop from the bufferable distribution output. Tracked as follow-up.
+RSZ_DONT_TOUCH_RX: "^$"
 
 # CTS sink clustering. The 12-PLL array adds thousands of reference-domain flops, so the core
 # clock tree is large; OpenROAD's default sink clustering (~20 sinks per leaf buffer) drives each

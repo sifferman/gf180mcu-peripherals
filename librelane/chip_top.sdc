@@ -46,23 +46,76 @@ if { [info exists ::env(MAX_CAPACITANCE_CONSTRAINT)] } {
 
 set clocks [get_clocks $clock_port]
 
-# Bidirectional pads
-set clk_core_inout_ports [get_ports { 
-    bidir_PAD[*]
-}] 
+# =================================================================================================
+# Per-interface I/O timing from the device datasheets.
+#
+# The chip is the clock source for both external interfaces: it forwards clk_PAD out as the RMII
+# REF_CLK (bidir_PAD[3]) and as the SDRAM clock (bidir_PAD[24]). Both forwarded clocks are clk_PAD
+# divided-by-1 (same edge), so all interface I/O is referenced to clk_PAD here -- a first-order
+# system-synchronous model where the clock-forwarding insertion delay is a common-mode offset folded
+# into margin. (Signoff refinement: define bidir_PAD[3]/[24] as generated clocks and reference each
+# group to them, so OpenROAD computes data-vs-forwarded-clock skew directly. Board trace delay is
+# not included -- add per the actual PCB.) Datasheet sources:
+#   - LAN8720A, Table 5.10 "REF_CLK In Mode" (p.72): the chip drives the 50 MHz ref clock.
+#       RX (PHY->MAC) output-valid t_oval(max)=14.0 ns, output-hold t_ohold(min)=3.0 ns
+#       TX (MAC->PHY) setup t_su=4.0 ns, hold t_ihold=1.5 ns
+#   - Winbond W9825G6KH AC table (p.15), -6 grade, CAS latency 3:
+#       read   DQ: access tAC(max)=5.0 ns, output-hold tOH(min)=3.0 ns
+#       inputs   : setup tIS=1.5 ns, hold tIH=0.8 ns (common to cmd/addr/cke/dqm/write-DQ)
+# Pad map (normal datapath mode) from chip_core.sv:
+#   input_PAD[0..3] = RMII crs_dv/rx_er/rxd0/rxd1   input_PAD[4] = mode strap (static)
+#   bidir_PAD[0..2] = RMII tx_en/txd0/txd1   [3] = RMII ref_clk(out)   [4..7] = status LEDs
+#   bidir_PAD[8..23] = SDRAM DQ[15:0] (bidir)   [24] = SDRAM clk(out)
+#   bidir_PAD[25..29] = cke/cs/ras/cas/we   [30..31] = dqm   [32..44] = addr   [45..46] = ba
+# =================================================================================================
 
-set_input_delay -min $input_delay_min_value -clock $clocks $clk_core_inout_ports
-set_input_delay -max $input_delay_value -clock $clocks $clk_core_inout_ports
-set_output_delay $output_delay_value -clock $clocks $clk_core_inout_ports
+# --- RMII RX inputs (PHY -> MAC), launched off REF_CLK ---
+set rmii_rx_in [get_ports {input_PAD[0] input_PAD[1] input_PAD[2] input_PAD[3]}]
+set_input_delay -clock $clocks -max 14.0 $rmii_rx_in
+set_input_delay -clock $clocks -min 3.0  $rmii_rx_in
 
-# Input-only pads
-set clk_core_input_ports [get_ports { 
-    rst_n_PAD
-    input_PAD[*]
-}] 
+# --- RMII TX outputs (MAC -> PHY), sampled by the PHY off REF_CLK ---
+set rmii_tx_out [get_ports {bidir_PAD[0] bidir_PAD[1] bidir_PAD[2]}]
+set_output_delay -clock $clocks -max 4.0  $rmii_tx_out
+set_output_delay -clock $clocks -min -1.5 $rmii_tx_out
 
-set_input_delay -min $input_delay_min_value -clock $clocks $clk_core_input_ports
-set_input_delay -max $input_delay_value -clock $clocks $clk_core_input_ports
+# --- SDRAM command/address/control outputs (bidir_PAD[25..46]): tIS=1.5 / tIH=0.8 ---
+set sdram_ctrl_names {}
+for {set i 25} {$i <= 46} {incr i} { lappend sdram_ctrl_names "bidir_PAD\[$i\]" }
+set sdram_ctrl_out [get_ports $sdram_ctrl_names]
+set_output_delay -clock $clocks -max 1.5  $sdram_ctrl_out
+set_output_delay -clock $clocks -min -0.8 $sdram_ctrl_out
+
+# --- SDRAM DQ[15:0] (bidir_PAD[8..23]): write = output (tIS/tIH), read = input (tAC/tOH) ---
+set sdram_dq_names {}
+for {set i 8} {$i <= 23} {incr i} { lappend sdram_dq_names "bidir_PAD\[$i\]" }
+set sdram_dq [get_ports $sdram_dq_names]
+set_output_delay -clock $clocks -max 1.5  $sdram_dq
+set_output_delay -clock $clocks -min -0.8 $sdram_dq
+set_input_delay  -clock $clocks -max 5.0  $sdram_dq
+set_input_delay  -clock $clocks -min 3.0  $sdram_dq
+
+# --- SD-card response inputs share bidir_PAD[1] (CMD) / [2] (DAT0) in SD mode ---
+# SD is a slow, divided-clock (clk/CLK_DIV ~ 6-12 MHz) source-synchronous interface and the reader
+# oversamples, so it is far less critical than the 50 MHz datapath that shares these pads. The tight
+# RMII-TX output constraint above already dominates; add only a relaxed input constraint so the SD
+# read path is bounded, not unconstrained. (Approximate -- a precise model would use a divided clock.)
+set sd_resp_in [get_ports {bidir_PAD[1] bidir_PAD[2]}]
+set_input_delay -clock $clocks -max [expr $::env(CLOCK_PERIOD) * 0.5] $sd_resp_in
+set_input_delay -clock $clocks -min 0.0 $sd_resp_in
+
+# --- Status LEDs (bidir_PAD[4..7]) drive LEDs only: no capture flop, no setup requirement ---
+set_false_path -to [get_ports {bidir_PAD[4] bidir_PAD[5] bidir_PAD[6] bidir_PAD[7]}]
+
+# --- mode strap (input_PAD[4]): static configuration, never toggles in operation ---
+set_false_path -from [get_ports {input_PAD[4]}]
+
+# --- Reset: externally asserted, async; recovery/removal is not single-cycle critical ---
+set_input_delay -clock $clocks -max [expr $::env(CLOCK_PERIOD) * 0.5] [get_ports {rst_n_PAD}]
+set_input_delay -clock $clocks -min 0.0 [get_ports {rst_n_PAD}]
+
+# Forwarded clock outputs bidir_PAD[3] (RMII ref_clk) and bidir_PAD[24] (SDRAM clk) carry clk_PAD to
+# the peripherals -- they are clocks, not data, so they intentionally get NO data output delay.
 
 # Output load
 set cap_load [expr $::env(OUTPUT_CAP_LOAD) / 1000.0]

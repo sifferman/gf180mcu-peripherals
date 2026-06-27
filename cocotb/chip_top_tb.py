@@ -353,6 +353,10 @@ def chip_top_runner():
         sources.append(PROJ / "../src/adpll/adpll_config.sv")
         sources.append(PROJ / "../src/adpll/adpll_array_csr.sv")
         sources.append(PROJ / "../src/adpll/adpll_array.sv")
+        # SD-card file-to-LED (vendored split-IO WangXuan95 reader)
+        _sd = PROJ / "../src/sdcard"
+        sources += [_sd / "sdcmd_ctrl.sv", _sd / "sd_reader.sv", _sd / "sd_file_reader.sv",
+                    _sd / "sdcard_file_to_led.v"]
         _sdc = PROJ / "../third_party/ultraembedded_axi_sdram_controller/src_v"
         sources += [_sdc / "sdram_axi.v", _sdc / "sdram_axi_core.v", _sdc / "sdram_axi_pmem.v"]
         if not gl:

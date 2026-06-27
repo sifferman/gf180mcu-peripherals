@@ -112,6 +112,12 @@ VERILOG_FILES:
 - dir::../src/adpll/adpll_config.sv
 - dir::../src/adpll/adpll_array_csr.sv
 - dir::../src/adpll/adpll_array.sv
+# SD-card file-to-LED (WangXuan95 GPLv3 reader, vendored into src/sdcard/ with the inout CMD line
+# split into out/oe/in so it maps to the gf180 bidir pad). Shares the datapath pads via mode_strap.
+- dir::../src/sdcard/sdcmd_ctrl.sv
+- dir::../src/sdcard/sd_reader.sv
+- dir::../src/sdcard/sd_file_reader.sv
+- dir::../src/sdcard/sdcard_file_to_led.v
 # Top + core
 - dir::../src/chip_core.sv
 - dir::../src/chip_top.sv

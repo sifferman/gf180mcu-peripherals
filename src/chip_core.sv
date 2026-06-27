@@ -391,12 +391,33 @@ adpll_array #(
     .obs_lock_o    (obs_lock)
 );
 
-// Bidir pad outputs (see pad map above)
-assign bidir_out[0]     = rmii_tx_en;
-assign bidir_out[2:1]   = rmii_txd;
-assign bidir_out[3]     = clk;            // RMII ref_clk to PHY
-assign bidir_out[7:4]   = led[3:0];
-assign bidir_out[23:8]  = sdram_dq_out;
+// SD-card file-to-LED demo. mode_strap (input_in[4]) = 1 selects SD mode, which time-shares the
+// Ethernet/SDRAM bidir pads (they never run together): bidir[0]=SCK, [1]=CMD (bidir), [2]=DAT0 (in),
+// [3]=SD_RESET, [19:4]=16 LEDs; card-detect reuses the crs_dv input pad. CMD is a split bidir so the
+// gf180 pad resolves the inout. Reads example.txt's first two bytes onto the LEDs.
+wire        sd_mode = input_in[4];
+wire        sd_sck, sd_cmd_o, sd_cmd_oe, sd_reset;
+wire [15:0] sd_led;
+sdcard_file_to_led #(.SIMULATE(0), .CLK_DIV(3'd2)) i_sdcard (
+    .clk_i     (clk),
+    .rstn_i    (rst_n),
+    .sd_reset_o(sd_reset),
+    .sd_sck_o  (sd_sck),
+    .sd_cmd_o  (sd_cmd_o),
+    .sd_cmd_oe (sd_cmd_oe),
+    .sd_cmd_i  (bidir_in[1]),
+    .sd_dat0_i (bidir_in[2]),
+    .sd_cd_i   (input_in[0]),
+    .led_o     (sd_led)
+);
+
+// Bidir pad outputs -- SD mode overrides bidir[0..19]; normal mode = Ethernet + SDRAM datapath.
+assign bidir_out[0]     = sd_mode ? sd_sck              : rmii_tx_en;
+assign bidir_out[1]     = sd_mode ? sd_cmd_o            : rmii_txd[0];
+assign bidir_out[2]     = sd_mode ? 1'b0                : rmii_txd[1];   // SD DAT0 = input
+assign bidir_out[3]     = sd_mode ? sd_reset            : clk;           // RMII ref_clk to PHY
+assign bidir_out[7:4]   = sd_mode ? sd_led[3:0]         : led[3:0];
+assign bidir_out[23:8]  = sd_mode ? {4'b0, sd_led[15:4]} : sdram_dq_out; // [19:8]=LEDs[15:4]
 assign bidir_out[24]    = sdram_clk;
 assign bidir_out[25]    = sdram_cke;
 assign bidir_out[26]    = sdram_cs;
@@ -407,9 +428,13 @@ assign bidir_out[31:30] = sdram_dqm;
 assign bidir_out[44:32] = sdram_addr;
 assign bidir_out[46:45] = sdram_ba;
 
-// Output enables: the SDRAM DQ bus is tri-stated by the controller, everything else drives.
-assign bidir_oe[7:0]    = 8'hFF;
-assign bidir_oe[23:8]   = {16{sdram_dq_oe}};
+// Output enables: SD mode -> SCK/RESET/LEDs drive, CMD per sd_cmd_oe, DAT0 input. Normal -> SDRAM DQ
+// tri-stated by the controller, everything else drives.
+assign bidir_oe[0]      = 1'b1;
+assign bidir_oe[1]      = sd_mode ? sd_cmd_oe : 1'b1;
+assign bidir_oe[2]      = sd_mode ? 1'b0      : 1'b1;   // SD DAT0 input
+assign bidir_oe[7:3]    = 5'h1F;
+assign bidir_oe[23:8]   = sd_mode ? 16'hFFFF  : {16{sdram_dq_oe}};
 assign bidir_oe[46:24]  = {23{1'b1}};
 
 assign sdram_dq_in      = bidir_in[23:8];
@@ -424,8 +449,8 @@ assign input_pu = '0;
 assign input_pd = '0;
 
 logic _unused;
-assign _unused = &{1'b0, led[7:4], input_in[NUM_INPUT_PADS-1:4],
-                   bidir_in[7:0], bidir_in[NUM_BIDIR_PADS-1:24], analog,
+assign _unused = &{1'b0, led[7:4], rmii_rx_er,
+                   bidir_in[0], bidir_in[7:3], bidir_in[NUM_BIDIR_PADS-1:24], analog,
                    obs_dco_clk, obs_lock};
 
 endmodule

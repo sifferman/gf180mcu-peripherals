@@ -26,18 +26,18 @@ module sdcard_file_to_led #(
 
     output wire        sd_reset_o,     // low = slot powered
     output wire        sd_sck_o,
-    inout  wire        sd_cmd_io,
-    inout  wire [3:0]  sd_dat_io,      // DAT0 = data in; DAT3/2/1 driven high
+    // SD CMD as split bidir, so the gf180 bidir pad (Y/OE/A) resolves the inout at the chip top:
+    output wire        sd_cmd_o,       // CMD drive value
+    output wire        sd_cmd_oe,      // CMD output-enable (1 = chip drives CMD)
+    input  wire        sd_cmd_i,       // CMD read value (from the pad)
+    input  wire        sd_dat0_i,      // DAT0 read (DAT3..1 held high at the chip pad in SD mode)
     input  wire        sd_cd_i,        // card-detect (low = card present)
 
     output wire [15:0] led_o
 );
 
-    // Keep the card in SD native mode, and power the slot.
-    assign sd_dat_io[3:1] = 3'b111;
-    assign sd_dat_io[0]   = 1'bz;
-    wire   sddat0         = sd_dat_io[0];
-    assign sd_reset_o     = 1'b0;
+    // Power the slot (DAT3..1 are held high at the chip pad to keep the card in SD native mode).
+    assign sd_reset_o = 1'b0;
 
     // Release the reader once a card is present and stable (~84 ms @ 50 MHz);
     // re-init automatically on (re)insertion.
@@ -60,9 +60,11 @@ module sdcard_file_to_led #(
     ) u_reader (
         .rstn            ( rstn      ),
         .clk             ( clk_i     ),
-        .sdclk           ( sd_sck_o  ),
-        .sdcmd           ( sd_cmd_io ),
-        .sddat0          ( sddat0    ),
+        .sdclk           ( sd_sck_o   ),
+        .sdcmd_o         ( sd_cmd_o   ),
+        .sdcmd_oe        ( sd_cmd_oe  ),
+        .sdcmd_i         ( sd_cmd_i   ),
+        .sddat0          ( sd_dat0_i  ),
         .card_stat       (           ),
         .card_type       (           ),
         .filesystem_type (           ),

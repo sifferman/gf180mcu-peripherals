@@ -175,3 +175,12 @@ sim-adpll-array: ## CSR framework: program every distinct PLL over AXI4-Lite, po
 # DCO SPICE characterization (freq-vs-code, PVT corners) is being moved to OpenROAD/Magic
 # parasitic extraction from the hardened ring_dco macros (single source of truth = the .sv),
 # replacing the former hand-written schematic-netlist generator. No make target yet.
+
+sim-sdcard: ## SD-card file-to-LED block test: split-IO reader + sd_fake model + FAT32 image -> LEDs
+	@mkdir -p cocotb/sim_build
+	iverilog -g2012 -I cocotb/models -o cocotb/sim_build/tb_sdcard \
+		cocotb/models/tb_sdcard.v \
+		src/sdcard/sdcard_file_to_led.v src/sdcard/sd_file_reader.sv src/sdcard/sd_reader.sv \
+		src/sdcard/sdcmd_ctrl.sv third_party/wangxuan95_sdcard/SIM/sd_fake.v
+	vvp cocotb/sim_build/tb_sdcard | grep -E "PASS|FAIL|waiting"
+.PHONY: sim-sdcard

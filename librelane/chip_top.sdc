@@ -192,11 +192,16 @@ if { [llength $tdc_cells] > 0 } {
 # -> phase_o path genuinely has 4 cycles -- a VALID multicycle (the launch register is stable for 4
 # cycles), not a relaxation. The phase loop bandwidth is far below the reference rate, so the slower
 # phase update is harmless. Declare setup=4 / hold=3 from the TDC snapshot registers. Guarded.
-set tdc_samp [get_cells -hierarchical -quiet {*adpll_tdc_flash*sampled*}]
+# Anchor on the snapshot NETS (sampled[*]), not the flop instances: synthesis renames the inferred
+# flops (no "sampled" in the instance name) but the nets keep it (189 across the 3 phase PLLs,
+# verified on the floorplanned netlist). A path -through a sampled net is exactly sampled_flop -> Q ->
+# decode -> phase_o register, i.e. the deep decode; the delay-line -> sampled.D side uses other nets
+# (and is false-pathed above), and the sample counter/enables are untouched.
+set tdc_samp [get_nets -hierarchical -quiet {*adpll_tdc_flash*sampled*}]
 if { [llength $tdc_samp] > 0 } {
-    puts "\[INFO] ADPLL: TDC decode 4-cycle multicycle from [llength $tdc_samp] snapshot regs"
-    set_multicycle_path 4 -setup -from $tdc_samp
-    set_multicycle_path 3 -hold  -from $tdc_samp
+    puts "\[INFO] ADPLL: TDC decode 4-cycle multicycle through [llength $tdc_samp] snapshot nets"
+    set_multicycle_path 4 -setup -through $tdc_samp
+    set_multicycle_path 3 -hold  -through $tdc_samp
 }
 
 if { [info exists ::env(OPENLANE_SDC_IDEAL_CLOCKS)] && $::env(OPENLANE_SDC_IDEAL_CLOCKS) } {

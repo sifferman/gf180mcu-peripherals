@@ -238,14 +238,20 @@ async def test_adpll_csr_over_udp(dut):
     assert ctrl_rb & 1, f"CTRL.enable not set ({ctrl_rb:#x})"
     log.info("CSR read-back OK: MUL=%d DIV=%d CTRL=%#x", mul_rb, div_rb, ctrl_rb)
 
-    # let the loop run a little, then sample STATUS (lock may not assert in this short
-    # window; we only require the register to be readable and tune to be advancing).
-    await Timer(40, "us")
-    status = await csr_read(STAT)
-    tune = (status >> 1) & 0x7F
-    log.info("ADPLL STATUS=%#010x  lock=%d tune=%d", status, status & 1, tune)
-
-    log.info("PASS: ADPLL programmed + read back over Ethernet")
+    # Poll STATUS over Ethernet until the PLL locks -- proves it actually turns on + closes the loop
+    # via the CSR (not just that the registers are writable). PLL0 (bang-bang x binary) at the chip's
+    # 50 MHz ref / MUL=1707,DIV=256 settles near tune~11.
+    locked = False
+    for _ in range(80):
+        await Timer(10, "us")
+        status = await csr_read(STAT)
+        tune = (status >> 1) & 0x7F
+        if status & 1:
+            locked = True
+            log.info("ADPLL LOCKED via CSR over Ethernet: STATUS=%#010x lock=1 tune=%d", status, tune)
+            break
+    assert locked, f"ADPLL did not lock over the poll window (last STATUS=%#010x tune={tune})" % status
+    log.info("PASS: ADPLL turned on AND locked via CSR over Ethernet (tune=%d)", tune)
 
 
 # ---------------------------------------------------------------------------

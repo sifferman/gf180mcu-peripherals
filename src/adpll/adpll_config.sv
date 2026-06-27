@@ -67,6 +67,10 @@ module adpll_config #(
     // proportionalintegral filter has a phase variant, so FilterSel is ignored when Domain=1.
     parameter int unsigned  Domain                        = 0,    // 0 = FLL, 1 = phase
     parameter int unsigned  PhaseTdcPhaseWidth            = 6,
+    // Decimate the TDC snapshot/decode to every Nth reference cycle so the deep decode (priority
+    // encode + divide) becomes a valid N-cycle multicycle on the 50 MHz reference (see chip_top.sdc);
+    // the phase loop bandwidth is far below the reference rate so the slower phase update is harmless.
+    parameter int unsigned  PhaseTdcSampleEveryN          = 4,
     parameter int unsigned  PhaseAlphaShift               = 6,
     parameter int unsigned  PhaseBetaShift                = 11,
 
@@ -217,7 +221,7 @@ end else begin : phase
   wire _unused_phase_div = &{1'b0, ref_div_i};
   if (DcoSel == 1) begin : dco
     adpll_phase_proportionalintegral_thermometer #(
-        .DcoNumTuneBits(DcoNumTuneBits), .TdcPhaseWidth(PhaseTdcPhaseWidth),
+        .DcoNumTuneBits(DcoNumTuneBits), .TdcPhaseWidth(PhaseTdcPhaseWidth), .TdcSampleEveryN(PhaseTdcSampleEveryN),
         .PhaseDetectorFcwWidth(FreqDetectorEdgeCountWidth),
         .LoopFilterAlphaShift(PhaseAlphaShift), .LoopFilterBetaShift(PhaseBetaShift),
         .LockMinSamplesForLock(LockMinSamplesForLock), .LockBandRadius(LockBandRadius)
@@ -227,7 +231,7 @@ end else begin : phase
         .debug_dco_tune_o(debug_dco_tune_o), .debug_dco_clk_o(debug_dco_clk_o));
   end else if (DcoSel == 2) begin : dco
     adpll_phase_proportionalintegral_muxtap #(
-        .DcoNumTuneBits(DcoNumTuneBits), .TdcPhaseWidth(PhaseTdcPhaseWidth),
+        .DcoNumTuneBits(DcoNumTuneBits), .TdcPhaseWidth(PhaseTdcPhaseWidth), .TdcSampleEveryN(PhaseTdcSampleEveryN),
         .PhaseDetectorFcwWidth(FreqDetectorEdgeCountWidth),
         .LoopFilterAlphaShift(PhaseAlphaShift), .LoopFilterBetaShift(PhaseBetaShift),
         .LockMinSamplesForLock(LockMinSamplesForLock), .LockBandRadius(LockBandRadius)
@@ -237,7 +241,7 @@ end else begin : phase
         .debug_dco_tune_o(debug_dco_tune_o), .debug_dco_clk_o(debug_dco_clk_o));
   end else begin : dco   // binary (DcoSel 0; coarsefine has no phase variant)
     adpll_phase_proportionalintegral_binary #(
-        .DcoNumTuneBits(DcoNumTuneBits), .TdcPhaseWidth(PhaseTdcPhaseWidth),
+        .DcoNumTuneBits(DcoNumTuneBits), .TdcPhaseWidth(PhaseTdcPhaseWidth), .TdcSampleEveryN(PhaseTdcSampleEveryN),
         .PhaseDetectorFcwWidth(FreqDetectorEdgeCountWidth),
         .LoopFilterAlphaShift(PhaseAlphaShift), .LoopFilterBetaShift(PhaseBetaShift),
         .LockMinSamplesForLock(LockMinSamplesForLock), .LockBandRadius(LockBandRadius)

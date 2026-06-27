@@ -185,6 +185,20 @@ if { [llength $tdc_cells] > 0 } {
     set_false_path -through $tdc_cells
 }
 
+# --- ADPLL flash-TDC decode: a 4-cycle multicycle (matches the RTL snapshot decimation) -----------
+# The TDC's combinational decode (a NumPhaseUnits-wide priority encode + a divide) is too deep to
+# settle in one 50 MHz cycle. The RTL (adpll_tdc_flash, PhaseTdcSampleEveryN=4) snapshots the delay
+# line and re-registers phase_o/period_valid only every 4 reference cycles, so the sampled -> decode
+# -> phase_o path genuinely has 4 cycles -- a VALID multicycle (the launch register is stable for 4
+# cycles), not a relaxation. The phase loop bandwidth is far below the reference rate, so the slower
+# phase update is harmless. Declare setup=4 / hold=3 from the TDC snapshot registers. Guarded.
+set tdc_samp [get_cells -hierarchical -quiet {*adpll_tdc_flash*sampled*}]
+if { [llength $tdc_samp] > 0 } {
+    puts "\[INFO] ADPLL: TDC decode 4-cycle multicycle from [llength $tdc_samp] snapshot regs"
+    set_multicycle_path 4 -setup -from $tdc_samp
+    set_multicycle_path 3 -hold  -from $tdc_samp
+}
+
 if { [info exists ::env(OPENLANE_SDC_IDEAL_CLOCKS)] && $::env(OPENLANE_SDC_IDEAL_CLOCKS) } {
     unset_propagated_clock [all_clocks]
 } else {

@@ -7,8 +7,12 @@
 // matches that PLL's STATUS lock bit. Runs under Icarus (SYNTHESIS undefined, behavioural DCOs).
 // PASSes only if all 12 PLLs lock in range and the mux tracks the selection.
 
+`ifndef NUM_VARIANTS
+  `define NUM_VARIANTS 4
+`endif
 module tb_adpll_array;
-  localparam int unsigned NUM_PLL  = 12;
+  localparam int unsigned NUM_VARIANTS = `NUM_VARIANTS;  // must match adpll_array NumVariants
+  localparam int unsigned NUM_PLL  = 12 * NUM_VARIANTS;
   localparam int unsigned NUM_TUNE = 7;
   localparam int unsigned MUL      = 1707;   // target edges/window (N)
   localparam int unsigned DIV      = 256;    // window length (M)
@@ -31,7 +35,7 @@ module tb_adpll_array;
   wire [1:0]  bresp, rresp;
   wire        obs_dco_clk, obs_lock;
 
-  adpll_array #(.NumTuneBits(NUM_TUNE)) u_array (
+  adpll_array #(.NumTuneBits(NUM_TUNE), .NumVariants(NUM_VARIANTS)) u_array (
       .clk_i(clk), .rst_ni(rst_n),
       .s_axil_awaddr(awaddr), .s_axil_awprot(3'b0), .s_axil_awvalid(awvalid), .s_axil_awready(awready),
       .s_axil_wdata(wdata), .s_axil_wstrb(4'hF), .s_axil_wvalid(wvalid), .s_axil_wready(wready),
@@ -87,7 +91,7 @@ module tb_adpll_array;
     $display("programmed all %0d PLLs: mul=%0d div=%0d enable=1", NUM_PLL, MUL, DIV);
 
     // Poll every PLL's STATUS until all lock (they run concurrently).
-    for (n = 0; n < 40000 && locked != {NUM_PLL{1'b1}}; n = n + 1) begin
+    for (n = 0; n < 200000 && locked != {NUM_PLL{1'b1}}; n = n + 1) begin
       for (i = 0; i < NUM_PLL; i = i + 1) begin
         if (!locked[i]) begin
           axil_read(stat_a(i), rd);
@@ -126,7 +130,7 @@ module tb_adpll_array;
   end
 
   initial begin
-    #(8000000ns);   // hard ceiling
+    #(80000000ns);   // hard ceiling (scales with PLL count -- polling each over AXI is the cost)
     $display("FAIL: global timeout (locked=0x%0h)", locked);
     $finish;
   end

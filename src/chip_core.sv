@@ -352,13 +352,14 @@ sdram_wrap i_sdram (
     .sdram_dq_i  (sdram_dq_in)
 );
 
-// On-chip ADPLL array (observe-only): 12 loop-filter x DCO adplls (adpll_array), each programmed
-// independently over Ethernet through adpll_array_csr at 0x2000_0000 (enable/mul/div) and read
-// back (lock/tune). It does NOT clock the core. Observability at the chip level is the per-PLL
+// On-chip ADPLL array (observe-only): many genuinely-distinct loop-filter x DCO x gain/lock adplls
+// (adpll_array, 12 * NumVariants of them, filling the spare die as a characterization vehicle), each
+// programmed independently over Ethernet through adpll_array_csr at 0x2000_0000 (enable/mul/div) and
+// read back (lock/tune). It does NOT clock the core. Observability at the chip level is the per-PLL
 // CSR STATUS over Ethernet: the gf180 analog pads (asig_5p0) cannot carry routed digital signals
 // (driving a DCO clock onto them leaves the internal sink open -> LVS), so the CSR-selected
-// observation mux (obs_dco_clk/obs_lock) is not brought to a pad. The 12 ring DCOs survive
-// synthesis via (* keep *)/(* dont_touch *) inside each macro.
+// observation mux (obs_dco_clk/obs_lock) is not brought to a pad. Every ring DCO survives synthesis
+// via (* keep *)/(* dont_touch *) inside its module.
 wire obs_dco_clk;
 wire obs_lock;
 

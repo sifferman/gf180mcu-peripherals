@@ -158,11 +158,12 @@ ADPLL_IP    = third_party/adpll/rtl
 sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr: ## ADPLL IP sims (delegated to third_party/adpll)
 	$(MAKE) -C third_party/adpll $@
 
-sim-adpll-array: ## CSR framework: program all 12 PLLs over AXI4-Lite, poll each for lock, test obs mux
+sim-adpll-array: ## CSR framework: program every distinct PLL over AXI4-Lite, poll each for lock, test obs mux
 	@mkdir -p cocotb/sim_build
 	iverilog -g2012 -c <(printf '+timescale+1ns/1ps\n') -o cocotb/sim_build/tb_adpll_array \
-		src/csr/adpll_array_csr.sv src/adpll_array.sv third_party/adpll/rtl/adpll/adpll_*.sv \
-		$(ADPLL_IP)/loop_filter/adpll_loop_filter_bangbang.sv $(ADPLL_IP)/loop_filter/adpll_loop_filter_pi.sv \
+		src/csr/adpll_array_csr.sv src/adpll_array.sv src/adpll_config.sv \
+		$(ADPLL_IP)/loop_filter/adpll_loop_filter_bangbang.sv \
+		$(ADPLL_IP)/loop_filter/adpll_loop_filter_proportionalintegral.sv \
 		$(ADPLL_IP)/loop_filter/adpll_loop_filter_gearshift.sv \
 		$(ADPLL_IP)/adpll_freq_detector.sv $(ADPLL_IP)/adpll_freq_counter.sv $(ADPLL_IP)/adpll_lock_detector.sv \
 		$(ADPLL_IP)/adpll_post_divider.sv \

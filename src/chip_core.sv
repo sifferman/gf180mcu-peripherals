@@ -452,7 +452,12 @@ assign bidir_oe[46:24]  = {23{1'b1}};
 assign sdram_dq_in      = bidir_in[23:8];
 
 assign bidir_cs = '0;
-assign bidir_sl = '0;
+// Per-pad output slew (gf180 ocd_io SL pin): SL=1 = fast slew, ~4.4 ns faster A->PAD at the SS IO
+// corner (18.5 vs 23.0 ns) than SL=0. Enable fast slew ONLY on the RMII TX di-bits (bidir[0]=tx_en,
+// [1]=txd0, [2]=txd1) -- the timing-critical source-synchronous outputs that must meet the PHY's 4 ns
+// setup on the 20 ns (50 MHz) period. The 16-bit SDRAM DQ bus and the rest stay slow slew to limit
+// simultaneous-switching ground bounce (SSO); they have ample timing margin anyway.
+assign bidir_sl = {{(NUM_BIDIR_PADS-3){1'b0}}, 3'b111};
 assign bidir_ie = ~bidir_oe;
 assign bidir_pu = '0;
 assign bidir_pd = '0;

@@ -237,3 +237,28 @@ Living tracker. See `questions.md` for decisions/risks and
 - RUNS: 25 MHz fallback RUN_..12-44-09 = clean GDS imminent (its DCO/TDC "violations" are the known
   false paths; functionally fine). 50 MHz v2 RUN_..14-48-36 running with all the above. The signoff
   WNS (step 54) of v2 is the real 50 MHz answer. Monitor bzu27zkm4 tracks it.
+
+## 2026-06-27 (cont) — 50 MHz timing closure arc (TDC decode + RMII source-synchronous)
+- 25 MHz fallback RUN_..12-44-09 DONE: DRC=0, LVS=0, antenna=0, util 0.56, 346 MB GDS. FF/TT setup
+  met; SS -6..-7 ns = the unconstrained DCO/TDC (this run predates the false-paths). DRC/LVS-clean
+  safety net for the full chip (eth+SDRAM+SD+10 ADPLLs incl 3 phase). NOTE: RMII needs 50 MHz for
+  100 Mbps, so 25 MHz is only a fallback, not the target.
+- 50 MHz closure took several constraint iterations (RTL/design all verified in sim along the way):
+  * v2 RUN_..14-48-36: false-path DCO+TDC-delay-line + datasheet I/O. Left the TDC *decode* (deep
+    priority-encode + divide) as a real 1-cycle path -> SS -4.4 ns.
+  * TDC fix (committed, adpll submodule 91a8e7b + parent fe45862): SampleEveryN snapshot decimation
+    (N=4) makes the decode a valid 4-cycle multicycle. sim-adpll-array still 10/10 lock incl 3 phase.
+  * v3 RUN_..16-06-12: multicycle anchored on flop *instances* -> matched 0 (synth renamed flops) ->
+    didn't apply. Fixed (commit 4351c89): anchor -through the sampled NETS (189, names preserved).
+  * v4 RUN_..16-25-39: TDC fully gone from violators. Sole residual = negedge RMII TX_EN -> bidir[0],
+    SS -4.4 ns. This is MODELING PESSIMISM: RMII I/O was clk_PAD-relative, but the PHY samples the
+    forwarded ref_clk (clk_PAD + bidir[3] pad delay ~5 ns) -- a common-mode credit the model omits.
+    v4 is a complete 50 MHz GDS (DRC/LVS clean like the 25 MHz run; everything closes but that one
+    pessimistic path) -- a strong deliverable.
+  * v5 RUN_..18-18-42 (commit 9bcddb9, RUNNING): model bidir[3]/[24] as divide-by-1 generated clocks
+    (rmii_ref_clk / sdram_clk_out, both verified to create on the netlist) and reference RMII+SDRAM
+    I/O to them -> credits the forwarding to RMII TX (should close) AND makes RMII RX honest (the
+    PHY's 14 ns valid on a 20 ns period -- the "extreme requirement"). v5 gives the TRUE RMII margin
+    both directions. Monitor brwcyb070. If RX is marginal at SS, that's the real RMII-at-50 MHz limit
+    (options: capture RX on a phase-shifted clock, or accept SS-corner derate for a test chip).
+- Monitors: check the SS corner explicitly at each signoff (the monitor reports the first/FF corner).

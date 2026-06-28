@@ -72,9 +72,11 @@ puts "\[INFO] RMII I/O referenced to clock: $rmii_clk ; SDRAM I/O referenced to:
 # SDRAM clock is still chip-driven (forwarded out bidir_PAD[24]) and is modeled as a generated clock
 # above so its I/O gets the clock-forwarding credit. Board trace delay not included -- add per the PCB.
 # Datasheet sources:
-#   - LAN8720A, Table 5.10 "REF_CLK In Mode" (p.72): the chip drives the 50 MHz ref clock.
-#       RX (PHY->MAC) output-valid t_oval(max)=14.0 ns, output-hold t_ohold(min)=3.0 ns
-#       TX (MAC->PHY) setup t_su=4.0 ns, hold t_ihold=1.5 ns
+#   - LAN8720A, Table 5.9 "REF_CLK Out Mode" (p.71): the PHY sources REFCLKO (Option A). Note these
+#     differ from the In-mode table -- RX valid is MUCH tighter to the clock (5 ns) and TX needs more
+#     setup (7 ns), because the PHY launches RX off the clock it generates.
+#       RX (PHY->MAC) output-valid t_oval(max)=5.0 ns, output-hold t_ohold(min)=1.4 ns
+#       TX (MAC->PHY) setup t_su=7.0 ns, hold t_ihold=2.0 ns
 #   - Winbond W9825G6KH AC table (p.15), -6 grade, CAS latency 3:
 #       read   DQ: access tAC(max)=5.0 ns, output-hold tOH(min)=3.0 ns
 #       inputs   : setup tIS=1.5 ns, hold tIH=0.8 ns (common to cmd/addr/cke/dqm/write-DQ)
@@ -87,13 +89,13 @@ puts "\[INFO] RMII I/O referenced to clock: $rmii_clk ; SDRAM I/O referenced to:
 
 # --- RMII RX inputs (PHY -> MAC), launched off REF_CLK ---
 set rmii_rx_in [get_ports {input_PAD[0] input_PAD[1] input_PAD[2] input_PAD[3]}]
-set_input_delay -clock $rmii_clk -max 14.0 $rmii_rx_in
-set_input_delay -clock $rmii_clk -min 3.0  $rmii_rx_in
+set_input_delay -clock $rmii_clk -max 5.0 $rmii_rx_in
+set_input_delay -clock $rmii_clk -min 1.4 $rmii_rx_in
 
 # --- RMII TX outputs (MAC -> PHY), sampled by the PHY off REF_CLK ---
 set rmii_tx_out [get_ports {bidir_PAD[0] bidir_PAD[1] bidir_PAD[2]}]
-set_output_delay -clock $rmii_clk -max 4.0  $rmii_tx_out
-set_output_delay -clock $rmii_clk -min -1.5 $rmii_tx_out
+set_output_delay -clock $rmii_clk -max 7.0  $rmii_tx_out
+set_output_delay -clock $rmii_clk -min -2.0 $rmii_tx_out
 
 # --- SDRAM command/address/control outputs (bidir_PAD[25..46]): tIS=1.5 / tIH=0.8 ---
 set sdram_ctrl_names {}

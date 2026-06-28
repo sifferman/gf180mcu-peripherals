@@ -105,3 +105,25 @@ gear x binary. The remaining 10 still span ALL 3 loop filters, ALL 4 DCOs, both 
 phase) and both tune widths, and index 0 (bb x binary, the Ethernet-UDP CSR test baseline) is
 unchanged. Validated: make sim-adpll-array -> 10/10 lock in range + obs mux OK.
 If 10+SD still overflows, next lever is 12->9 or shrink a 7-bit FLL config to 5-bit.
+
+## 2026-06-27 — DECISION NEEDED: RMII clocking architecture for 50 MHz RX closure
+After closing the TDC decode (multicycle) and RMII TX (forwarded generated-clock credit), the ONE
+remaining 50 MHz timing failure is RMII RX (input_PAD[0..3] crs_dv/rx_er/rxd), and it is a genuine
+architecture limit, not a constraint/modeling artifact:
+  - In REF_CLK-In mode (current: chip forwards clk_PAD out bidir[3] as the PHY ref_clk), the PHY drives
+    RXD valid up to t_oval=14 ns after ref_clk. With the ref_clk forwarding delay (clk -> bidir[3]
+    output pad, ~5 ns) added, RX data arrives ~19-24 ns after the launching clk edge -- past the 20 ns
+    capture window. STA (honest, referenced to the forwarded clock): -1.0 ns TT, -5.9 ns SS.
+  - Neither edge helps: posedge is the best available (-1 ns TT); negedge captures a half-cycle EARLIER
+    (worse, -4.3 ns); a 2-cycle multicycle is invalid (PHY drives new RXD every cycle). The FPGA
+    reference only closed this via IDELAY/MMCM, which gf180 lacks.
+OPTIONS (your call):
+  (A) REF_CLK-Out mode: strap the LAN8720A to OUTPUT its 50 MHz REFCLKO and drive the chip's clk_PAD
+      FROM it (board change: clk_PAD <- PHY REFCLKO instead of a crystal; bidir[3] ref_clk forward no
+      longer needed). Then RX is captured on the same clock the PHY launched from -> full 20-14 = 6 ns
+      budget, no forwarding penalty -> closes. RECOMMENDED for a clean 50 MHz RMII. Needs a chip_core
+      clocking tweak + the board/strap.
+  (B) Accept RMII RX as SS-corner-marginal for a test chip (it meets ~TT with board tuning; SS is the
+      pessimistic extreme). Ship the 50 MHz GDS with the documented RX violation.
+  (C) Lower the RMII line rate / run the datapath <50 MHz (loses 100 Mbps spec compliance).
+Everything else closes at 50 MHz (core logic, SDRAM, SD, all 10 ADPLLs incl 3 phase, RMII TX).

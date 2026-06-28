@@ -75,18 +75,17 @@ module chip_core #(
     inout  wire [NUM_ANALOG_PADS-1:0] analog
 );
 
-// RMII RX is source-synchronous off the forwarded ref_clk. The LAN8720A drives RXD/CRS_DV valid up
-// to t_oval=14 ns after the REF_CLK edge; on a 20 ns (50 MHz) period, once the ref_clk forwarding
-// delay through the output pad is included, a same-edge (posedge) capture has no setup margin (STA:
-// -1 ns at TT, -5.9 ns at SS). Re-capture the RX di-bits on the negedge of clk -- a half-cycle (10 ns)
-// later -- which is the standard RMII RX timing technique and mirrors the negedge TX launch. The MAC
-// then sees RX shifted by half a cycle (consistent latency; RMII framing is edge-aligned, so decode
-// is unaffected). Hold is comfortable (PHY holds RX t_ohold=3 ns, captured ~10 ns later).
-logic [3:0] rmii_rx_neg_q;
-always_ff @(negedge clk) rmii_rx_neg_q <= input_in[3:0];
-wire       rmii_crs_dv = rmii_rx_neg_q[0];
-wire       rmii_rx_er  = rmii_rx_neg_q[1];
-wire [1:0] rmii_rxd    = rmii_rx_neg_q[3:2];
+// RMII RX (posedge capture). NOTE: at 50 MHz in REF_CLK-In mode (this chip forwards clk out as the
+// PHY ref_clk), this path does NOT meet setup at SS: the LAN8720A drives RXD/CRS_DV valid up to
+// t_oval=14 ns after REF_CLK, and the ref_clk forwarding delay through the output pad pushes the data
+// arrival past the 20 ns capture window (STA -1 ns TT, -5.9 ns SS, referenced to the forwarded
+// rmii_ref_clk). A negedge capture is worse (captures a half-cycle earlier); a 2-cycle multicycle is
+// invalid (the PHY drives new RXD every cycle). The real fix is an architecture choice -- run the PHY
+// in REF_CLK-Out mode so clk_PAD is sourced FROM the PHY's 50 MHz REFCLKO (no forwarding penalty;
+// RX then has the full 20-14 = 6 ns budget). See questions.md / STATUS.md. Tracked for your decision.
+wire       rmii_crs_dv = input_in[0];
+wire       rmii_rx_er  = input_in[1];
+wire [1:0] rmii_rxd    = input_in[3:2];
 
 wire       rmii_tx_en;
 wire [1:0] rmii_txd;

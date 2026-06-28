@@ -46,6 +46,21 @@ if { [info exists ::env(MAX_CAPACITANCE_CONSTRAINT)] } {
 
 set clocks [get_clocks $clock_port]
 
+# --- Forwarded clocks (generated from clk_PAD) -----------------------------------------------------
+# The chip drives clk_PAD out as the RMII ref_clk (bidir_PAD[3]) and the SDRAM clock (bidir_PAD[24]);
+# the PHY and SDRAM sample relative to THOSE forwarded clocks, not clk_PAD directly. Model them as
+# divide-by-1 generated clocks and reference each interface's I/O delays to them, so STA credits the
+# clock-forwarding insertion delay (data and the forwarded clock share the same output-pad delay -- a
+# ~5 ns common-mode term that a clk_PAD-relative model omits, which falsely failed the RMII TX at SS).
+# In normal mode bidir_PAD[3] = clk through the SD mux; in SD mode it is sd_reset (static, not timed).
+set CGC_SRC [get_pins $::env(CLOCK_NET)]
+catch { create_generated_clock -name rmii_ref_clk  -source $CGC_SRC -divide_by 1 [get_ports {bidir_PAD[3]}] }
+catch { create_generated_clock -name sdram_clk_out -source $CGC_SRC -divide_by 1 [get_ports {bidir_PAD[24]}] }
+# Reference each interface to its forwarded clock if it was created, else fall back to clk_PAD.
+set rmii_clk  [expr {[llength [get_clocks -quiet rmii_ref_clk]]  ? {rmii_ref_clk}  : $clock_port}]
+set sdram_clk [expr {[llength [get_clocks -quiet sdram_clk_out]] ? {sdram_clk_out} : $clock_port}]
+puts "\[INFO] RMII I/O referenced to clock: $rmii_clk ; SDRAM I/O referenced to: $sdram_clk"
+
 # =================================================================================================
 # Per-interface I/O timing from the device datasheets.
 #
@@ -71,29 +86,29 @@ set clocks [get_clocks $clock_port]
 
 # --- RMII RX inputs (PHY -> MAC), launched off REF_CLK ---
 set rmii_rx_in [get_ports {input_PAD[0] input_PAD[1] input_PAD[2] input_PAD[3]}]
-set_input_delay -clock $clocks -max 14.0 $rmii_rx_in
-set_input_delay -clock $clocks -min 3.0  $rmii_rx_in
+set_input_delay -clock $rmii_clk -max 14.0 $rmii_rx_in
+set_input_delay -clock $rmii_clk -min 3.0  $rmii_rx_in
 
 # --- RMII TX outputs (MAC -> PHY), sampled by the PHY off REF_CLK ---
 set rmii_tx_out [get_ports {bidir_PAD[0] bidir_PAD[1] bidir_PAD[2]}]
-set_output_delay -clock $clocks -max 4.0  $rmii_tx_out
-set_output_delay -clock $clocks -min -1.5 $rmii_tx_out
+set_output_delay -clock $rmii_clk -max 4.0  $rmii_tx_out
+set_output_delay -clock $rmii_clk -min -1.5 $rmii_tx_out
 
 # --- SDRAM command/address/control outputs (bidir_PAD[25..46]): tIS=1.5 / tIH=0.8 ---
 set sdram_ctrl_names {}
 for {set i 25} {$i <= 46} {incr i} { lappend sdram_ctrl_names "bidir_PAD\[$i\]" }
 set sdram_ctrl_out [get_ports $sdram_ctrl_names]
-set_output_delay -clock $clocks -max 1.5  $sdram_ctrl_out
-set_output_delay -clock $clocks -min -0.8 $sdram_ctrl_out
+set_output_delay -clock $sdram_clk -max 1.5  $sdram_ctrl_out
+set_output_delay -clock $sdram_clk -min -0.8 $sdram_ctrl_out
 
 # --- SDRAM DQ[15:0] (bidir_PAD[8..23]): write = output (tIS/tIH), read = input (tAC/tOH) ---
 set sdram_dq_names {}
 for {set i 8} {$i <= 23} {incr i} { lappend sdram_dq_names "bidir_PAD\[$i\]" }
 set sdram_dq [get_ports $sdram_dq_names]
-set_output_delay -clock $clocks -max 1.5  $sdram_dq
-set_output_delay -clock $clocks -min -0.8 $sdram_dq
-set_input_delay  -clock $clocks -max 5.0  $sdram_dq
-set_input_delay  -clock $clocks -min 3.0  $sdram_dq
+set_output_delay -clock $sdram_clk -max 1.5  $sdram_dq
+set_output_delay -clock $sdram_clk -min -0.8 $sdram_dq
+set_input_delay  -clock $sdram_clk -max 5.0  $sdram_dq
+set_input_delay  -clock $sdram_clk -min 3.0  $sdram_dq
 
 # --- SD-card response inputs share bidir_PAD[1] (CMD) / [2] (DAT0) in SD mode ---
 # SD is a slow, divided-clock (clk/CLK_DIV ~ 6-12 MHz) source-synchronous interface and the reader

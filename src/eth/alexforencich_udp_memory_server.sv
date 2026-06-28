@@ -165,12 +165,12 @@ eth_mac_rmii_fifo #(
     .speed(2'b01)                      // 100 Mb/s (LAN8720A links at 100M FD)
 );
 
-// TX di-bits relaunched on the falling edge of REF_CLK (board source-sync timing)
-delay_to_negedge #(.Width(3)) u_tx_negedge (
-    .clk_i(phy_rmii_ref_clk_i),
-    .d_i({rmii_txen_pre, rmii_txd_pre}),
-    .q_o({phy_rmii_txen_o, phy_rmii_txd_o})
-);
+// TX di-bits launched on the POSEDGE (the MAC's own TX register output), no negedge relaunch.
+// In REF_CLK-Out mode (clk_PAD is the shared ref_clk), the PHY captures TX on the next rising edge,
+// so a posedge launch gives the full clock period of setup window (20 ns @ 50 MHz); the negedge
+// relaunch (a REF_CLK-In / FPGA technique) would instead halve that window to 10 ns and FAIL the
+// PHY's 7 ns setup at SS. Posedge launch closes TX (and keeps the whole datapath posedge-only).
+assign {phy_rmii_txen_o, phy_rmii_txd_o} = {rmii_txen_pre, rmii_txd_pre};
 
 eth_axis_rx eth_axis_rx_inst (
     .clk(clk_i),

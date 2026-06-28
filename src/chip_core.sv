@@ -423,7 +423,11 @@ sdcard_file_to_led #(.SIMULATE(0), .CLK_DIV(3'd2)) i_sdcard (
 assign bidir_out[0]     = sd_mode ? sd_sck              : rmii_tx_en;
 assign bidir_out[1]     = sd_mode ? sd_cmd_o            : rmii_txd[0];
 assign bidir_out[2]     = sd_mode ? 1'b0                : rmii_txd[1];   // SD DAT0 = input
-assign bidir_out[3]     = sd_mode ? sd_reset            : clk;           // RMII ref_clk to PHY
+assign bidir_out[3]     = sd_mode ? sd_reset            : 1'b0;          // spare: REF_CLK-Out mode --
+// the LAN8720A sources the 50 MHz RMII REF_CLK (REFCLKO) which drives clk_PAD on the board, so the
+// chip no longer forwards clk here. This removes the ref_clk forwarding delay from the RMII RX budget
+// (the PHY launches RX and the chip captures it on the SAME clock), letting RMII RX close at 50 MHz.
+// bidir[3] is now a free pad (driven low in normal mode; sd_reset in SD mode).
 assign bidir_out[7:4]   = sd_mode ? sd_led[3:0]         : led[3:0];
 assign bidir_out[23:8]  = sd_mode ? {4'b0, sd_led[15:4]} : sdram_dq_out; // [19:8]=LEDs[15:4]
 assign bidir_out[24]    = sdram_clk;

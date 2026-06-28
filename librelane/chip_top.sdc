@@ -54,23 +54,24 @@ set clocks [get_clocks $clock_port]
 # ~5 ns common-mode term that a clk_PAD-relative model omits, which falsely failed the RMII TX at SS).
 # In normal mode bidir_PAD[3] = clk through the SD mux; in SD mode it is sd_reset (static, not timed).
 set CGC_SRC [get_pins $::env(CLOCK_NET)]
-catch { create_generated_clock -name rmii_ref_clk  -source $CGC_SRC -divide_by 1 [get_ports {bidir_PAD[3]}] }
+# REF_CLK-Out mode (chosen): the LAN8720A sources the 50 MHz RMII ref_clk (REFCLKO) onto clk_PAD, so
+# clk_PAD IS the shared ref_clk -- RMII I/O is referenced to it directly with NO forwarding delay (the
+# PHY launches RX/captures TX on the same clock the chip uses), which is what lets RMII RX close at
+# 50 MHz. Only the SDRAM clock is still chip-driven (forwarded out bidir_PAD[24]); model THAT as a
+# generated clock so the SDRAM I/O gets its clock-forwarding credit.
 catch { create_generated_clock -name sdram_clk_out -source $CGC_SRC -divide_by 1 [get_ports {bidir_PAD[24]}] }
-# Reference each interface to its forwarded clock if it was created, else fall back to clk_PAD.
-set rmii_clk  [expr {[llength [get_clocks -quiet rmii_ref_clk]]  ? {rmii_ref_clk}  : $clock_port}]
+set rmii_clk  $clock_port
 set sdram_clk [expr {[llength [get_clocks -quiet sdram_clk_out]] ? {sdram_clk_out} : $clock_port}]
 puts "\[INFO] RMII I/O referenced to clock: $rmii_clk ; SDRAM I/O referenced to: $sdram_clk"
 
 # =================================================================================================
 # Per-interface I/O timing from the device datasheets.
 #
-# The chip is the clock source for both external interfaces: it forwards clk_PAD out as the RMII
-# REF_CLK (bidir_PAD[3]) and as the SDRAM clock (bidir_PAD[24]). Both forwarded clocks are clk_PAD
-# divided-by-1 (same edge), so all interface I/O is referenced to clk_PAD here -- a first-order
-# system-synchronous model where the clock-forwarding insertion delay is a common-mode offset folded
-# into margin. (Signoff refinement: define bidir_PAD[3]/[24] as generated clocks and reference each
-# group to them, so OpenROAD computes data-vs-forwarded-clock skew directly. Board trace delay is
-# not included -- add per the actual PCB.) Datasheet sources:
+# Clocking (REF_CLK-Out mode): the LAN8720A sources the 50 MHz RMII ref_clk (REFCLKO) onto clk_PAD,
+# so clk_PAD is the shared RMII reference -- RMII I/O references clk_PAD directly (no forwarding). The
+# SDRAM clock is still chip-driven (forwarded out bidir_PAD[24]) and is modeled as a generated clock
+# above so its I/O gets the clock-forwarding credit. Board trace delay not included -- add per the PCB.
+# Datasheet sources:
 #   - LAN8720A, Table 5.10 "REF_CLK In Mode" (p.72): the chip drives the 50 MHz ref clock.
 #       RX (PHY->MAC) output-valid t_oval(max)=14.0 ns, output-hold t_ohold(min)=3.0 ns
 #       TX (MAC->PHY) setup t_su=4.0 ns, hold t_ihold=1.5 ns
@@ -79,7 +80,7 @@ puts "\[INFO] RMII I/O referenced to clock: $rmii_clk ; SDRAM I/O referenced to:
 #       inputs   : setup tIS=1.5 ns, hold tIH=0.8 ns (common to cmd/addr/cke/dqm/write-DQ)
 # Pad map (normal datapath mode) from chip_core.sv:
 #   input_PAD[0..3] = RMII crs_dv/rx_er/rxd0/rxd1   input_PAD[4] = mode strap (static)
-#   bidir_PAD[0..2] = RMII tx_en/txd0/txd1   [3] = RMII ref_clk(out)   [4..7] = status LEDs
+#   bidir_PAD[0..2] = RMII tx_en/txd0/txd1   [3] = spare (PHY sources ref_clk)   [4..7] = status LEDs
 #   bidir_PAD[8..23] = SDRAM DQ[15:0] (bidir)   [24] = SDRAM clk(out)
 #   bidir_PAD[25..29] = cke/cs/ras/cas/we   [30..31] = dqm   [32..44] = addr   [45..46] = ba
 # =================================================================================================

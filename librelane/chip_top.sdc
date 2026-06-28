@@ -122,6 +122,21 @@ set sd_resp_in [get_ports {bidir_PAD[1] bidir_PAD[2]}]
 set_input_delay -clock $clocks -max [expr $::env(CLOCK_PERIOD) * 0.5] $sd_resp_in
 set_input_delay -clock $clocks -min 0.0 $sd_resp_in
 
+# --- SD-card reader sector-number arithmetic: multicycle ---
+# read_sector_no = first_data_sector + cluster_size * curr_cluster + offset -- a 32-bit multiply+add
+# evaluated only when the FAT FSM advances a cluster/sector, after which the reader streams a full 512 B
+# sector over the slow (clk/CLK_DIV) SD bus = thousands of clk cycles before read_sector_no changes
+# again. So this deep arithmetic has many cycles to settle; STA otherwise treats it as 1-cycle and it
+# is the lone -2 ns SS violator. Declare it a 2-cycle multicycle (unconditionally valid here -- every
+# update is followed by a long SD transfer). Anchored on the read_sector_no nets (32, regs renamed by
+# synthesis); this is the SD reader's only deep path. Guarded.
+set rsec [get_nets -hierarchical -quiet {*read_sector_no*}]
+if { [llength $rsec] > 0 } {
+    puts "\[INFO] SD: read_sector_no 2-cycle multicycle through [llength $rsec] nets"
+    set_multicycle_path 2 -setup -through $rsec
+    set_multicycle_path 1 -hold  -through $rsec
+}
+
 # --- Status LEDs (bidir_PAD[4..7]) drive LEDs only: no capture flop, no setup requirement ---
 set_false_path -to [get_ports {bidir_PAD[4] bidir_PAD[5] bidir_PAD[6] bidir_PAD[7]}]
 

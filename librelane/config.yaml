@@ -221,6 +221,15 @@ GRT_ALLOW_CONGESTION: true
 # Allow a larger Y displacement
 PL_MAX_DISPLACEMENT_Y: 200
 
+# Antenna handling. The GRT-based OpenROAD.RepairAntennas (pre-route diode insertion) deterministically
+# hits an OpenROAD global-router bug on this netlist -- "[GRT-0183] Net _001309_: heap underflow during
+# 3D maze routing" -- so disable it and instead mitigate antennas with (a) the non-GRT heuristic diode
+# insertion (Odb.HeuristicDiodeInsertion: pre-insert a diode on any net longer than the threshold) and
+# (b) the detailed router's own antenna repair pass (DRT, below). The final magic/klayout antenna check
+# still validates the result. (RepairAntennas was only triggered for routes the DRT pass already covers.)
+RUN_ANTENNA_REPAIR: false
+RUN_HEURISTIC_DIODE_INSERTION: true
+HEURISTIC_ANTENNA_THRESHOLD: 90  # µm: insert a protective diode on nets longer than this
 # Fix antenna violations after DRT
 DRT_ANTENNA_REPAIR_ITERS: 10
 DRT_ANTENNA_REPAIR_MARGIN: 10 # %

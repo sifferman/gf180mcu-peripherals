@@ -225,11 +225,26 @@ async def test_adpll_csr_over_udp(dut):
             f"bad CSR read resp @ {addr:#x}: {resp[:10].hex()}"
         return struct.unpack("<I", resp[10:14])[0]
 
-    log.info("Programming ADPLL over UDP: MUL=1707 DIV=256 enable=1")
+    log.info("Programming ADPLL over UDP: MUL=1707 DIV=256")
     await csr_write(MUL_A, 1707)
     await csr_write(DIV_A, 256)
-    await csr_write(CTRL, 1)
 
+    # Gate-level: do NOT enable the oscillator. Once CTRL.enable=1, the structural ring DCO free-runs
+    # in the zero-delay GL event sim and explodes the event queue (VCS RT_DYNEBLK2). The ring's
+    # oscillation/lock is verified by the ngspice mixed-signal cosim (make cosim / sim-adpll-csr), NOT
+    # by event-sim GLS. Here the "PLL CSRs" coverage = the AXI-lite register read/write path through
+    # the gate netlist (UDP -> bridge -> CSR @ 0x2000_0000 -> MUL/DIV/STATUS read-back), enable kept 0.
+    if gl:
+        mul_rb = await csr_read(MUL_A)
+        div_rb = await csr_read(DIV_A)
+        status = await csr_read(STAT)
+        assert mul_rb == 1707, f"MUL read-back {mul_rb} != 1707"
+        assert div_rb == 256, f"DIV read-back {div_rb} != 256"
+        log.info("PASS (GLS): ADPLL CSR write+read-back over Ethernet (MUL=%d DIV=%d STATUS=%#010x); osc/lock via cosim",
+                 mul_rb, div_rb, status)
+        return
+
+    await csr_write(CTRL, 1)
     mul_rb = await csr_read(MUL_A)
     div_rb = await csr_read(DIV_A)
     ctrl_rb = await csr_read(CTRL)
@@ -237,16 +252,6 @@ async def test_adpll_csr_over_udp(dut):
     assert div_rb == 256, f"DIV read-back {div_rb} != 256"
     assert ctrl_rb & 1, f"CTRL.enable not set ({ctrl_rb:#x})"
     log.info("CSR read-back OK: MUL=%d DIV=%d CTRL=%#x", mul_rb, div_rb, ctrl_rb)
-
-    # Gate-level: the structural ring DCO does not free-run/lock under plain Icarus event sim (it needs
-    # the ngspice mixed-signal cosim -- make cosim / sim-adpll-csr). So in GLS the CSR write+read-back
-    # above IS the coverage for "PLL CSRs" (the AXI-lite register interface through the gate netlist).
-    # The closed-loop lock is verified by the ngspice cosim, not here.
-    if gl:
-        # also exercise STATUS read so the readback datapath is covered end-to-end in gates
-        status = await csr_read(STAT)
-        log.info("PASS (GLS): ADPLL CSR write+read-back over Ethernet (STATUS=%#010x); lock via cosim", status)
-        return
 
     # RTL (behavioural DCO): poll STATUS over Ethernet until the PLL locks -- proves it actually turns
     # on + closes the loop via the CSR. PLL0 (bang-bang x binary) at 50 MHz ref / MUL=1707,DIV=256
@@ -431,10 +436,12 @@ def chip_top_runner():
         # the project/PDK modules do not, which VCS (unlike iverilog) rejects with ITSFM.
         build_args = ["-full64", "-sverilog", "-assert", "svaext",
                       "-override_timescale=1ns/1ps", "-LDFLAGS", "-no-pie"]
-        # Gate-level: the netlist is ~91% unreset (dfxtp) flops; without X-init the unreset control
-        # FSMs sit at X and the UDP-write handshake deadlocks under X-pessimism (the iverilog GL
-        # symptom). +vcs+initreg+0 initialises all regs to 0 so the datapath comes up defined.
+        # Gate-level: the netlist is ~91% unreset (dfxtp) flops; without X-init the unreset datapath
+        # sits at X and (under gate-level X-pessimism, worse than RTL) the UDP-write handshake
+        # deadlocks. VCS reg-init must be ENABLED AT COMPILE TIME (+vcs+initreg+random) and then the
+        # value is SELECTED AT RUNTIME (+vcs+initreg+0) -- runtime-only is a no-op (Warning-[VICIU]).
         if gl:
+            build_args += ["+vcs+initreg+random"]
             plusargs = ["+vcs+initreg+0"]
 
     runner = get_runner(sim)

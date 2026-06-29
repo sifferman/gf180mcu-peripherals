@@ -179,3 +179,14 @@ competed). Config was correct. So v16 = SETUP clean (all corners) + reg-to-reg H
 LESSON: don't run heavy sims during a harden's LVS step (or run LVS standalone on the freer box).
 v17 launched with hold-buffer budget 50->75% (+--skip Netgen.LVS to dodge starvation; confirm LVS
 standalone after) to close the I/O hold.
+
+### UPDATE @16:25 — GLS GREEN at gate-level (VCS) for eth/sdram/pll-csr
+make sim-gl with SIM=vcs on v16's verified netlist: TESTS=3 PASS=3.
+- test_arp_write_read  PASS  (Ethernet RX->ARP->TX + UDP write/read-back to on-chip mem, at gates)
+- test_adpll_csr_over_udp PASS (UDP->bridge->ADPLL CSR @0x2000_0000 MUL/DIV/STATUS read-back, at gates)
+- test_sdram_over_udp  PASS  (UDP->AXI->sdram_axi->external SDRAM write+read-back, at gates)
+Keys: VCS +vcs+initreg+random (compile) +vcs+initreg+0 (run) resolves the 91%-unreset-flop X-prop;
+GL keeps the ADPLL DISABLED (enabling the structural ring DCO explodes the zero-delay event queue ->
+VCS RT_DYNEBLK2; the ring osc/lock is the ngspice cosim's job). ~400x faster than iverilog.
+REMAINING for full GLS: SD-card file-to-LED (mode-muxed; needs an SD model + LED check) -- task #31.
+PLL oscillation/lock: covered by the green ngspice cosim (make cosim / sim-adpll-csr).

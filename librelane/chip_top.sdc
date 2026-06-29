@@ -125,8 +125,10 @@ set_input_delay  -clock $sdram_clk -min 3.0  $sdram_dq
 # while the real SDRAM write-DATA paths stay fully timed (they already met hold). NOT a data false-path.
 set oe_pins [get_pins -hierarchical -quiet {bidir*.pad/OE}]
 if { [llength $oe_pins] > 0 } {
-    puts "\[INFO] Bidir OE: false_path on [llength $oe_pins] pad output-enable pins (direction ctrl, not tIH data)"
-    set_false_path -to $oe_pins
+    puts "\[INFO] Bidir OE: false_path THROUGH [llength $oe_pins] pad output-enable pins (direction ctrl, not tIH data)"
+    # -THROUGH, not -to: the timing path ENDS at the output PORT (bidir_PAD[n]) and merely routes
+    # THROUGH the pad's OE pin to the PAD; a -to on the OE pin does not cut a path that ends past it.
+    set_false_path -through $oe_pins
 }
 
 # --- SD-card response inputs share bidir_PAD[1] (CMD) / [2] (DAT0) in SD mode ---
@@ -269,6 +271,26 @@ if { [llength $tdc_samp] > 0 } {
     puts "\[INFO] ADPLL: TDC decode 4-cycle multicycle through [llength $tdc_samp] snapshot nets"
     set_multicycle_path 4 -setup -through $tdc_samp
     set_multicycle_path 3 -hold  -through $tdc_samp
+}
+
+# --- ADPLL FLL loop-filter accumulator: a 2-cycle multicycle (genuinely multicycle) ---------------
+# The loop-filter tune accumulator (a wide add/clamp -- DELAY synthesis maps it to a parallel-prefix
+# adder, but it is still deep at the SS 125C/3v00 corner) updates ONLY when the frequency detector
+# emits a new error strobe (loop_filter valid_i), which fires once per measurement window of
+# window_length_i reference cycles (adpll_freq_counter: window_tick = count >= window_length_i-1).
+# A 1-cycle window is non-functional (can't measure a frequency from one clk cycle), so in any real
+# config window_length_i >= 2 and the accumulator is stable for >= 2 cycles between updates -- a VALID
+# 2-cycle multicycle, not a relaxation. (For a HARDWARE guarantee independent of firmware, clamp
+# window_length_i >= 2 in adpll_freq_counter; tracked as a follow-up in sifferman/adpll.) Anchor -TO
+# the registers driving the CSR tune readback nets (adpll_array_csr.tune_i) -- these are the loop-
+# filter tune_q accumulators across the 10 PLLs (440 cells incl. the readback-mux loads; the
+# multicycle applies only to the register endpoints among them). Verified on the routed netlist:
+# SS setup -0.22 -> +2.67 ns; the next-worst real single-cycle path is +2.67 (nothing real hidden).
+set fll_tune [get_cells -quiet -of_objects [get_nets -hierarchical -quiet {*adpll_array_csr*tune_i*}]]
+if { [llength $fll_tune] > 0 } {
+    puts "\[INFO] ADPLL: FLL loop-filter 2-cycle multicycle TO [llength $fll_tune] tune-accumulator cells"
+    set_multicycle_path 2 -setup -to $fll_tune
+    set_multicycle_path 1 -hold  -to $fll_tune
 }
 
 if { [info exists ::env(OPENLANE_SDC_IDEAL_CLOCKS)] && $::env(OPENLANE_SDC_IDEAL_CLOCKS) } {

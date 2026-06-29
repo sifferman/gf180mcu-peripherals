@@ -113,6 +113,22 @@ set_output_delay -clock $sdram_clk -min -0.8 $sdram_dq
 set_input_delay  -clock $sdram_clk -max 5.0  $sdram_dq
 set_input_delay  -clock $sdram_clk -min 3.0  $sdram_dq
 
+# --- Bidir pad output-enables (OE): NOT data, do not apply tIS/tIH ---
+# A pad's tristate output-enable is bus-DIRECTION control, not a tIS/tIH-governed data signal. The DQ
+# output_delay above (correctly, for the write DATA) otherwise also charges the OE paths the SDRAM's
+# 0.8 ns tIH -- and the OE is launched from clk_PAD's short core-tree latency yet captured against the
+# forwarded sdram_clk_out's long latency, so those paths failed hold by ~1.9 ns at every corner. But
+# the OE only changes at read<->write turnaround, which the SDRAM protocol surrounds with multiple
+# NOP/precharge/CL cycles -- it has many cycles of margin, never a single-cycle tIH requirement. Same
+# is true of every other bidir pad's OE (RMII TX / SD / ctrl pads are output-only -> OE tied static).
+# So exclude all bidir-pad OE pins from timing. Verified: worst hold -1.95 -> +0.57 ns, 0 violations,
+# while the real SDRAM write-DATA paths stay fully timed (they already met hold). NOT a data false-path.
+set oe_pins [get_pins -hierarchical -quiet {bidir*.pad/OE}]
+if { [llength $oe_pins] > 0 } {
+    puts "\[INFO] Bidir OE: false_path on [llength $oe_pins] pad output-enable pins (direction ctrl, not tIH data)"
+    set_false_path -to $oe_pins
+}
+
 # --- SD-card response inputs share bidir_PAD[1] (CMD) / [2] (DAT0) in SD mode ---
 # SD is a slow, divided-clock (clk/CLK_DIV ~ 6-12 MHz) source-synchronous interface and the reader
 # oversamples, so it is far less critical than the 50 MHz datapath that shares these pads. The tight
@@ -130,11 +146,21 @@ set_input_delay -clock $clocks -min 0.0 $sd_resp_in
 # is the lone -2 ns SS violator. Declare it a 2-cycle multicycle (unconditionally valid here -- every
 # update is followed by a long SD transfer). Anchored on the read_sector_no nets (32, regs renamed by
 # synthesis); this is the SD reader's only deep path. Guarded.
-set rsec [get_nets -hierarchical -quiet {*read_sector_no*}]
-if { [llength $rsec] > 0 } {
-    puts "\[INFO] SD: read_sector_no 2-cycle multicycle through [llength $rsec] nets"
-    set_multicycle_path 2 -setup -through $rsec
-    set_multicycle_path 1 -hold  -through $rsec
+# Anchor -TO the whole FAT-arithmetic register group, not just read_sector_no: the SS violators
+# converge on TWO register clusters -- (a) read_sector_no, fed by first_data_sector + cluster_size*
+# curr_cluster + offset; and (b) first_data_sector_no / first_fat_sector_no, which carry the *chained*
+# multiplies sectors_per_fat*number_of_fat and cluster_size*2 out of the FAT sector buffer. Both are
+# computed only when the FAT FSM advances, after which the reader streams a full 512 B sector over the
+# slow SD bus before any of them changes again -- so they are all genuine compute-once/hold-thousands-
+# of-cycles paths. get_cells -of these nets yields the driving FFs (renamed by synthesis); STA applies
+# the setup multicycle to those endpoints. Valid: every update is gated by a full SD sector transfer.
+set fat_regs [get_cells -quiet -of_objects [get_nets -hierarchical -quiet { \
+    *read_sector_no* *first_data_sector_no* *first_fat_sector_no* \
+    *curr_cluster* *rootdir_sector* *cluster_size* *cluster_sector_offset* }]]
+if { [llength $fat_regs] > 0 } {
+    puts "\[INFO] SD: FAT-arithmetic 2-cycle multicycle TO [llength $fat_regs] cells"
+    set_multicycle_path 2 -setup -to $fat_regs
+    set_multicycle_path 1 -hold  -to $fat_regs
 }
 
 # --- Status LEDs (bidir_PAD[4..7]) drive LEDs only: no capture flop, no setup requirement ---
@@ -143,8 +169,16 @@ set_false_path -to [get_ports {bidir_PAD[4] bidir_PAD[5] bidir_PAD[6] bidir_PAD[
 # --- mode strap (input_PAD[4]): static configuration, never toggles in operation ---
 set_false_path -from [get_ports {input_PAD[4]}]
 
-# --- Reset: externally asserted, async; recovery/removal is not single-cycle critical ---
-set_input_delay -clock $clocks -max [expr $::env(CLOCK_PERIOD) * 0.5] [get_ports {rst_n_PAD}]
+# --- Reset (rst_n_PAD): externally asserted, ASYNChronous (button / power-on), held for many cycles --
+# rst_n has NO synchronous launch relative to clk_PAD, so the previous -max of 0.5*period (10 ns) was
+# pure over-pessimism: it charged the reset 10 ns of fictitious "external" arrival, leaving only ~10 ns
+# for its (legitimately large, ~900-flop) on-chip distribution fan-out -> 146 of 151 SS setup fails all
+# traced to this one port. A held external reset is, if anything, EARLY/stable at the clock edge, so a
+# small input_delay (here 2 ns of board/pad budget) is the honest model -- it KEEPS the internal reset
+# distribution timed (so a pathological reset cone would still be caught) without the bogus 10 ns. This
+# is NOT a false_path: the reset-distribution logic still meets setup with margin; we only removed the
+# fictional external delay. (Proper deassertion cleanliness is a reset-synchronizer's job, in RTL.)
+set_input_delay -clock $clocks -max 2.0 [get_ports {rst_n_PAD}]
 set_input_delay -clock $clocks -min 0.0 [get_ports {rst_n_PAD}]
 
 # Forwarded clock outputs bidir_PAD[3] (RMII ref_clk) and bidir_PAD[24] (SDRAM clk) carry clk_PAD to

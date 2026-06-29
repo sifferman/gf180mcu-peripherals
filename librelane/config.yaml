@@ -176,10 +176,43 @@ IGNORE_DISCONNECTED_MODULES:
 - gf180mcu_ws_ip__logo
 - gf180mcu_ws_ip__marker
 
+# --- LVS: ignore fill / tap / decap cells (Netgen hang fix) ---
+# The 3v3 SCL (gf180mcu_as_sc_mcu7t3v3) + ocd_io flow inserts ~482k fill/tap/decap cells
+# (fill_1 113k, tap_2 86k, fillcap_4/8/16 ~200k). At that scale Netgen's partition refinement
+# does not converge -- LVS spun for 14+ h. These cells connect only to VDD/VSS rails, so dropping
+# them from the comparison does not reduce LVS coverage. LibreLane feeds this list to Netgen's
+# `ignore class` directive. Verified on the routed netlist: device count 445k -> 275k and Netgen
+# reports "Circuits match uniquely" in minutes. (Pattern from gf180mcu-project-template 3v3 branch.)
+LVS_IGNORE_CELLS:
+- gf180mcu_as_sc_mcu7t3v3__fill_1
+- gf180mcu_as_sc_mcu7t3v3__fill_2
+- gf180mcu_as_sc_mcu7t3v3__fill_4
+- gf180mcu_as_sc_mcu7t3v3__fill_8
+- gf180mcu_as_sc_mcu7t3v3__fillcap_4
+- gf180mcu_as_sc_mcu7t3v3__fillcap_8
+- gf180mcu_as_sc_mcu7t3v3__fillcap_16
+- gf180mcu_as_sc_mcu7t3v3__tap_2
+- gf180mcu_ocd_io__fill1
+- gf180mcu_ocd_io__fill5
+- gf180mcu_ocd_io__fill10
+- gf180mcu_ocd_io__fillnc
+
 # Clock
 CLOCK_PORT: clk_PAD
 CLOCK_NET: clk_pad/Y
 CLOCK_PERIOD: 20 # 50 MHz (experiment; was 40 = 25 MHz)
+
+# --- Delay-driven synthesis (attack ADPLL loop-filter logic DEPTH, not via multicycle) ---
+# The residual SS setup violator is the ADPLL PI loop-filter accumulator: a wide add/multiply that
+# the default "AREA 0" strategy (abc `amap`) maps as a ~40-level RIPPLE-CARRY chain (~18 ns of pure
+# cell delay -> fails the 20 ns period at the 125C/3v00 corner). This is a logic-DEPTH problem, not
+# placement or constraints: SDC cannot add cycle budget, and the path is NOT cleanly multicycle (the
+# freq-detector window is runtime-programmable to 1), so we do NOT false-path/multicycle it. Instead
+# flip abc to a DELAY strategy: `&dch` (don't-care logic restructuring) + `&nf` (delay-driven mapper)
+# + `retime` re-map the SAME RTL into a shallow parallel-prefix-style adder (~log2 depth), shrinking
+# the loop's combinational delay directly. RESYNTH does a second timing-driven restructuring pass in
+# PnR on whatever critical paths remain. No RTL change, no constraint relabeling.
+SYNTH_STRATEGY: "DELAY 0"
 
 # ADPLL ring-DCO nets: keep the resizer's hands off the oscillator. Resizer::dontTouch(net) only
 # returns true when the NET itself is do-not-touch -- the (* dont_touch *) on the inv/mux CELLS does

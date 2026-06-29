@@ -403,9 +403,17 @@ class RmiiSink(Reset):
                         continue
 
                 if cyc == cpd // 2:
-                    d_val = int(self.data.value)
-                    dv_val = int(self.dv.value)
-                    er_val = 0 if self.er is None else int(self.er.value)
+                    # Gate-level: when TX_EN is low, TXD is don't-care and the std-cell
+                    # output can be X; an unresolved TXD must not crash int(). Resolve any
+                    # X to 0 -- harmless while idle, and a genuine X inside a frame then
+                    # shows up as a payload mismatch in the test (informative) rather than
+                    # a monitor crash.
+                    def _res(sig):
+                        v = sig.value
+                        return int(v) if v.is_resolvable else 0
+                    d_val = _res(self.data)
+                    dv_val = _res(self.dv)
+                    er_val = 0 if self.er is None else _res(self.er)
 
                     if frame is None:
                         if dv_val:

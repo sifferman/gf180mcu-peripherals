@@ -238,9 +238,19 @@ async def test_adpll_csr_over_udp(dut):
     assert ctrl_rb & 1, f"CTRL.enable not set ({ctrl_rb:#x})"
     log.info("CSR read-back OK: MUL=%d DIV=%d CTRL=%#x", mul_rb, div_rb, ctrl_rb)
 
-    # Poll STATUS over Ethernet until the PLL locks -- proves it actually turns on + closes the loop
-    # via the CSR (not just that the registers are writable). PLL0 (bang-bang x binary) at the chip's
-    # 50 MHz ref / MUL=1707,DIV=256 settles near tune~11.
+    # Gate-level: the structural ring DCO does not free-run/lock under plain Icarus event sim (it needs
+    # the ngspice mixed-signal cosim -- make cosim / sim-adpll-csr). So in GLS the CSR write+read-back
+    # above IS the coverage for "PLL CSRs" (the AXI-lite register interface through the gate netlist).
+    # The closed-loop lock is verified by the ngspice cosim, not here.
+    if gl:
+        # also exercise STATUS read so the readback datapath is covered end-to-end in gates
+        status = await csr_read(STAT)
+        log.info("PASS (GLS): ADPLL CSR write+read-back over Ethernet (STATUS=%#010x); lock via cosim", status)
+        return
+
+    # RTL (behavioural DCO): poll STATUS over Ethernet until the PLL locks -- proves it actually turns
+    # on + closes the loop via the CSR. PLL0 (bang-bang x binary) at 50 MHz ref / MUL=1707,DIV=256
+    # settles near tune~11.
     locked = False
     for _ in range(80):
         await Timer(10, "us")
@@ -304,6 +314,9 @@ def chip_top_runner():
     tp = PROJ / "../third_party/alexforencich_ethernet"
 
     sources = [PROJ / "tb_top.sv"]
+    # Behavioural SDRAM model on the SDRAM pads -- a testbench component (not part of the DUT), so it
+    # belongs in BOTH RTL and gate-level builds (GLS must cover the eth->AXI->SDRAM datapath too).
+    sources.append(PROJ / "models/sdram_sim.v")
     defines = {f"SLOT_{slot.upper()}": True}
     includes = [PROJ / "../src/"]
 
@@ -359,8 +372,6 @@ def chip_top_runner():
                     _sd / "sdcard_file_to_led.v"]
         _sdc = PROJ / "../third_party/ultraembedded_axi_sdram_controller/src_v"
         sources += [_sdc / "sdram_axi.v", _sdc / "sdram_axi_core.v", _sdc / "sdram_axi_pmem.v"]
-        if not gl:
-            sources.append(PROJ / "models/sdram_sim.v")   # open behavioural SDRAM on the SDRAM pads
         # verilog-ethernet: only modules reachable from chip_top
         sources.append(PROJ / "../third_party/alexforencich_ethernet/lib/axis/rtl/arbiter.v")
         sources.append(PROJ / "../third_party/alexforencich_ethernet/lib/axis/rtl/axis_adapter.v")
@@ -407,10 +418,24 @@ def chip_top_runner():
     ]
 
     build_args = []
+    test_args = []
+    plusargs = []
     if sim == "icarus":
         build_args = ["-g2012"]
     if sim == "verilator":
         build_args = ["--timing", "--trace", "--trace-fst", "--trace-structs"]
+    if sim == "vcs":
+        # VCS M-2017.03 on a PIE-default Linux needs a non-PIE link (its prebuilt .o is non-PIC).
+        # -assert svaext enables the elaboration system tasks ($error) used in the ADPLL RTL.
+        # -override_timescale unifies timescale: the verilog-ethernet modules carry `timescale while
+        # the project/PDK modules do not, which VCS (unlike iverilog) rejects with ITSFM.
+        build_args = ["-full64", "-sverilog", "-assert", "svaext",
+                      "-override_timescale=1ns/1ps", "-LDFLAGS", "-no-pie"]
+        # Gate-level: the netlist is ~91% unreset (dfxtp) flops; without X-init the unreset control
+        # FSMs sit at X and the UDP-write handshake deadlocks under X-pessimism (the iverilog GL
+        # symptom). +vcs+initreg+0 initialises all regs to 0 so the datapath comes up defined.
+        if gl:
+            plusargs = ["+vcs+initreg+0"]
 
     runner = get_runner(sim)
     runner.build(
@@ -426,7 +451,8 @@ def chip_top_runner():
         waves=True,
     )
     runner.test(hdl_toplevel=hdl_toplevel,
-                test_module=os.getenv("TEST_MODULE", "chip_top_tb"), waves=True)
+                test_module=os.getenv("TEST_MODULE", "chip_top_tb"),
+                test_args=test_args, plusargs=plusargs, waves=True)
 
 
 if __name__ == "__main__":

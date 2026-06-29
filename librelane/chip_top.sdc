@@ -278,10 +278,10 @@ if { [llength $tdc_samp] > 0 } {
 # adder, but it is still deep at the SS 125C/3v00 corner) updates ONLY when the frequency detector
 # emits a new error strobe (loop_filter valid_i), which fires once per measurement window of
 # window_length_i reference cycles (adpll_freq_counter: window_tick = count >= window_length_i-1).
-# A 1-cycle window is non-functional (can't measure a frequency from one clk cycle), so in any real
-# config window_length_i >= 2 and the accumulator is stable for >= 2 cycles between updates -- a VALID
-# 2-cycle multicycle, not a relaxation. (For a HARDWARE guarantee independent of firmware, clamp
-# window_length_i >= 2 in adpll_freq_counter; tracked as a follow-up in sifferman/adpll.) Anchor -TO
+# adpll_freq_counter now CLAMPS the window to >= 2 (window_eff, sifferman/adpll d822b7e), so
+# sample_valid_o can never fire on consecutive clk_i cycles -- the accumulator is provably stable for
+# >= 2 cycles between updates. This makes the 2-cycle multicycle a PROVABLE hardware property, not a
+# firmware-window>=2 assumption (a 1-cycle window is non-functional and is now forbidden). Anchor -TO
 # the registers driving the CSR tune readback nets (adpll_array_csr.tune_i) -- these are the loop-
 # filter tune_q accumulators across the 10 PLLs (440 cells incl. the readback-mux loads; the
 # multicycle applies only to the register endpoints among them). Verified on the routed netlist:

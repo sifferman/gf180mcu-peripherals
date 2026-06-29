@@ -197,6 +197,15 @@ LVS_IGNORE_CELLS:
 - gf180mcu_ocd_io__fill10
 - gf180mcu_ocd_io__fillnc
 
+# --- Hold-repair budget (close the SDRAM source-synchronous output hold) ---
+# The SDRAM DQ/ctrl outputs (bidir_PAD[12..25]) are launched on clk_PAD but captured by the SDRAM on
+# the forwarded sdram_clk_out; the small launch-vs-forward skew leaves ~0.3-0.5 ns of write-data hold
+# at the fast corners. reg-to-reg hold is already clean; only these I/O paths need extra delay. The
+# default hold-repair (50% buffer budget) inserted 34k hold buffers then hit RSZ-0064 (gave up) with
+# ~54 left. Raise the budget so the resizer can finish delaying the SDRAM output paths.
+PL_RESIZER_HOLD_MAX_BUFFER_PCT: 75
+GRT_RESIZER_HOLD_MAX_BUFFER_PCT: 75
+
 # Clock
 CLOCK_PORT: clk_PAD
 CLOCK_NET: clk_pad/Y

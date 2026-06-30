@@ -236,3 +236,25 @@ registers adjacent to their pads (I/O register placement / floorplan), cutting t
 centered eye has margin at SS. = a floorplan effort, your call for test-chip vs production.
 DECISION (yours): (A) accept SS SDRAM-write-I/O marginality for the test chip (board-tunable) [recommended],
 or (B) invest in I/O-register-near-pad placement + the invert-aware SDRAM I/O constraint model.
+
+### UPDATE — SDRAM clock correctly declared as inverted generated clock (per OpenROAD source)
+Per the user: ~clk_i IS a distinct (180deg) clock; declared it properly. Consulted OpenROAD
+4c26918 / OpenSTA Genclks::recordSrcPaths: a divide-by-1 COMBINATIONAL generated clock only accepts
+the master->genclk source path when (inverting_path == invert). Our path clk_PAD -> ~clk_i ->
+bidir_PAD[24] is inverting, so -invert is REQUIRED. Changed chip_top.sdc:
+  create_generated_clock -name sdram_clk_out -source clk_pad/Y -combinational -invert [bidir_PAD[24]]
+(was -divide_by 1, no invert -> wrong phase: it modeled the SDRAM sampling posedge-aligned with the
+launch, which HID the real timing as "hold -0.5" instead of showing the true "setup -2.2").
+
+Correct model result on v16 (SS): SDRAM write DQ/cmd setup = -2.2 ns, hold = +0.64 (closed), reads OK.
+=> the real SDRAM marginality is WRITE SETUP, output-path-limited (~10 ns DQ flop->pad at SS = half
+the 20 ns period vs the centered half-cycle eye).
+
+REMAINING SDC REFINEMENT (insertion delay): the generated clock is on an OUTPUT PORT, so OpenSTA
+cannot propagate its insertion (STA-1062 "missing paths from master") -> it uses ~0 insertion while
+the DATA path carries the full clock-tree+logic delay => the -2.2 is PESSIMISTIC (clock and data
+really share the clock-tree insertion). To get the accurate number, define the gen clock on the
+INTERNAL pad-driver pin (not the boundary port) or add set_clock_latency -source on sdram_clk_out so
+the common clock-tree insertion is credited. That likely recovers a chunk of the -2.2.
+FIXES (posedge, no negedge): (A) accept (board-tunable) / (B) output-register-near-pad placement to
+cut the ~10 ns output path / (C) first do the insertion-delay SDC refinement to get the true margin.

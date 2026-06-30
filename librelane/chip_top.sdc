@@ -59,7 +59,16 @@ set CGC_SRC [get_pins $::env(CLOCK_NET)]
 # PHY launches RX/captures TX on the same clock the chip uses), which is what lets RMII RX close at
 # 50 MHz. Only the SDRAM clock is still chip-driven (forwarded out bidir_PAD[24]); model THAT as a
 # generated clock so the SDRAM I/O gets its clock-forwarding credit.
-catch { create_generated_clock -name sdram_clk_out -source $CGC_SRC -divide_by 1 [get_ports {bidir_PAD[24]}] }
+# The controller drives bidir_PAD[24] as `assign sdram_clk_o = ~clk_i` -- the master clock through ONE
+# combinational inverter (standard SDR-SDRAM trick: the SDRAM's rising edge then lands mid-eye of the
+# posedge-launched DQ/cmd). So sdram_clk_out is a -combinational -invert generated clock. Per OpenSTA
+# (Genclks::recordSrcPaths, OpenROAD 4c26918): a divide-by-1 *combinational* generated clock only
+# accepts the master->genclk source path when inverting_path == invert, so the -invert flag MUST match
+# the netlist's inverting path -- otherwise the clock has no source path (STA-1062) and its phase is
+# mis-modeled. -combinational makes OpenSTA propagate clk_PAD through the inverter for the edge +
+# insertion. This is one clock domain (synchronous, phase-locked 180deg to clk_PAD); all FLOPS remain
+# posedge clk_i -- only this forwarded OUTPUT clock pin is inverted.
+catch { create_generated_clock -name sdram_clk_out -source $CGC_SRC -combinational -invert [get_ports {bidir_PAD[24]}] }
 set rmii_clk  $clock_port
 set sdram_clk [expr {[llength [get_clocks -quiet sdram_clk_out]] ? {sdram_clk_out} : $clock_port}]
 puts "\[INFO] RMII I/O referenced to clock: $rmii_clk ; SDRAM I/O referenced to: $sdram_clk"

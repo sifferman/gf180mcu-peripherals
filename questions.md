@@ -211,3 +211,28 @@ FAST corners.
       half a cycle -> needs the ultraembedded controller's read latency re-checked + re-run the GL
       test_sdram. ~1 design change + 1 harden + GLS re-confirm.
 Recommendation: (A) for the test-chip tapeout; (B) if production-grade SDRAM write margin is wanted.
+
+### UPDATE — SDRAM I/O is source-synchronous-marginal at SS (correctly modeled); ALL-POSEDGE confirmed
+User preference: everything posedge. GOOD NEWS: the design already IS all-posedge AND already centers
+the SDRAM write eye -- the ultraembedded controller drives `assign sdram_clk_o = ~clk_i` (the standard
+SDRAM output-clock inversion; NOT a negedge flop -- all internal DQ/cmd logic is posedge clk_i).
+
+But this means the chip_top.sdc generated clock for bidir_PAD[24] should be -invert (it currently is
+NOT). Tested -invert on v16's netlist (SS):
+  - no-invert (current/validated): SDRAM write I/O shows as HOLD -0.5 ns (and setup +1.9).
+  - -invert (matches the ~clk_i silicon): write I/O shows as SETUP -2.2 ns on the DQ outputs
+    (bidir_PAD[8..23]) and HOLD +0.64 (closes).
+Same underlying truth either way: the SDRAM source-synchronous WRITE path is marginal at the SS
+125C/3v00 extreme corner because the on-chip DQ/cmd OUTPUT path (~10 ns at SS) is ~half the 20 ns
+period, so the centered half-cycle budget is tight. Board-tunable (real margin = W9825 tDS/tDH +
+board traces + actual chip delays, not SS-pessimistic STA). Everything else (core, RMII, SDRAM READ,
+all internal logic) is timing-clean; SDRAM datapath is functionally GLS-verified (write+read-back).
+
+REVERTED the quick -invert: the FULLY-correct model needs -invert AND the SDRAM input/output delays
+re-referenced to the inverted edges (write captured on the inverted rising edge; read driven relative
+to it) -- a careful both-directions constraint job + your board knowledge for the real margins.
+PROPER timing fix (posedge-compatible): shorten the SDRAM output path -- place the DQ/cmd output
+registers adjacent to their pads (I/O register placement / floorplan), cutting the ~10 ns so the
+centered eye has margin at SS. = a floorplan effort, your call for test-chip vs production.
+DECISION (yours): (A) accept SS SDRAM-write-I/O marginality for the test chip (board-tunable) [recommended],
+or (B) invest in I/O-register-near-pad placement + the invert-aware SDRAM I/O constraint model.

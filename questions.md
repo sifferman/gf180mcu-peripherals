@@ -190,3 +190,24 @@ GL keeps the ADPLL DISABLED (enabling the structural ring DCO explodes the zero-
 VCS RT_DYNEBLK2; the ring osc/lock is the ngspice cosim's job). ~400x faster than iverilog.
 REMAINING for full GLS: SD-card file-to-LED (mode-muxed; needs an SD model + LED check) -- task #31.
 PLL oscillation/lock: covered by the green ngspice cosim (make cosim / sim-adpll-csr).
+
+### UPDATE — v17 (hold-buffer 75%) does NOT close the SDRAM-output I/O hold
+v17 timing == v16 (hold -0.384/-0.483/-0.309, 17/36/2 vios, reg-to-reg=0). Raising the hold-buffer
+budget 50->75% made no difference => the router cannot delay these output-to-pad paths enough; it's
+a fundamental source-synchronous SKEW (DQ/ctrl launched on clk_PAD vs captured on the forwarded
+sdram_clk_out), not a buffer-budget issue.
+
+DECISION (user away -> logged, recommendation below):
+The chip is OTHERWISE fully timing-clean: setup clean all corners, reg-to-reg hold clean, DRC 0,
+LVS match. The only residual is 54 SDRAM-write-data/ctrl OUTPUT hold paths, -0.3..-0.5 ns at the
+FAST corners.
+  (A) ACCEPT for the test chip (RECOMMENDED). These are board-tunable source-synchronous write paths;
+      reg-to-reg is clean; real margin is set by the W9825 tDH + board trace match + the controller's
+      launch. -0.5 ns STA at the fast corner is within normal board-tuning range. Ship v16/v17 GDS.
+  (B) DETERMINISTIC fix = center the SDRAM clock in the data eye: forward sdram_clk_out INVERTED
+      (negedge / 180deg) so the SDRAM samples DQ mid-eye (~10 ns setup AND hold margin). Standard
+      SDRAM-write technique (the vivado_nexys reference used negedge). Does NOT change internal
+      all-posedge logic -- only the forwarded output clock. RISK: shifts the SDRAM READ capture by
+      half a cycle -> needs the ultraembedded controller's read latency re-checked + re-run the GL
+      test_sdram. ~1 design change + 1 harden + GLS re-confirm.
+Recommendation: (A) for the test-chip tapeout; (B) if production-grade SDRAM write margin is wanted.

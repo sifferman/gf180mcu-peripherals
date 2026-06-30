@@ -258,3 +258,15 @@ INTERNAL pad-driver pin (not the boundary port) or add set_clock_latency -source
 the common clock-tree insertion is credited. That likely recovers a chunk of the -2.2.
 FIXES (posedge, no negedge): (A) accept (board-tunable) / (B) output-register-near-pad placement to
 cut the ~10 ns output path / (C) first do the insertion-delay SDC refinement to get the true margin.
+
+### RESOLVED — SDRAM I/O closes once clock insertion is modeled (option C done)
+Defined sdram_clk_out's generated clock on the pad's CORE-SIDE pin (bidir[24].pad/A) instead of the
+boundary output port. OpenSTA can now propagate the master through the clk-tree+inverter -> the gen
+clock gets real insertion -> the shared clk-tree delay cancels between data launch and capture clock.
+Validated on v16 (SS, ss_125C_3v00): STA-1062 GONE; whole-design worst SETUP -2.21 -> +0.38 ns;
+worst HOLD +0.64 ns. No violators. The -2.2 was purely the insertion-modeling artifact. Conservative
+(A-pin omits the A->PAD pad delay the data outputs incur), so true margin is larger.
+=> SDRAM source-synchronous I/O is CLEAN. Whole chip now closes at SS: +0.38 setup / +0.64 hold,
+all-posedge (one register domain; only the forwarded SDRAM output clock is inverted, correctly
+modeled as -combinational -invert per OpenSTA Genclks semantics). SDRAM datapath also GLS-verified.
+This is an SDC-only change (no geometry impact) -> v16's GDS + this SDC = fully timing-clean.

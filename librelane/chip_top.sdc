@@ -68,7 +68,13 @@ set CGC_SRC [get_pins $::env(CLOCK_NET)]
 # mis-modeled. -combinational makes OpenSTA propagate clk_PAD through the inverter for the edge +
 # insertion. This is one clock domain (synchronous, phase-locked 180deg to clk_PAD); all FLOPS remain
 # posedge clk_i -- only this forwarded OUTPUT clock pin is inverted.
-catch { create_generated_clock -name sdram_clk_out -source $CGC_SRC -combinational -invert [get_ports {bidir_PAD[24]}] }
+# Define the generated clock on the pad's CORE-SIDE input pin (bidir[24].pad/A, the ~clk_i node), NOT
+# the boundary output port: OpenSTA cannot propagate a clock's insertion delay to an output PORT
+# (STA-1062 -> 0 insertion -> the shared clk-tree delay is counted on the data launch but not credited
+# on the capture clock -> spurious ~2 ns write-setup pessimism). On the internal A pin the master
+# propagates through the clk-tree + inverter so the common insertion is computed and cancels. Slightly
+# conservative (omits the A->PAD pad delay, which the data outputs do incur), so a pass here is real.
+catch { create_generated_clock -name sdram_clk_out -source $CGC_SRC -combinational -invert [get_pins {bidir\[24\].pad/A}] }
 set rmii_clk  $clock_port
 set sdram_clk [expr {[llength [get_clocks -quiet sdram_clk_out]] ? {sdram_clk_out} : $clock_port}]
 puts "\[INFO] RMII I/O referenced to clock: $rmii_clk ; SDRAM I/O referenced to: $sdram_clk"

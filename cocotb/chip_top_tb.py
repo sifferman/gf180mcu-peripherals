@@ -138,6 +138,7 @@ async def test_arp_write_read(dut):
     # RmiiPhy drives the 50 MHz reference clock onto clk (= clk_PAD); the chip
     # uses it for both the RMII and the core/AXI domain.
     phy = RmiiPhy(dut.txd, dut.tx_en, dut.clk, dut.rxd, dut.rx_er, dut.crs_dv)
+    dut.mode_strap.value = 0   # normal datapath mode (Ethernet/SDRAM); SD model held in reset
 
     # reset (active low)
     dut.rst_n.value = 0
@@ -194,6 +195,7 @@ async def test_adpll_csr_over_udp(dut):
     log = dut._log
     log.setLevel(logging.INFO)
     phy = RmiiPhy(dut.txd, dut.tx_en, dut.clk, dut.rxd, dut.rx_er, dut.crs_dv)
+    dut.mode_strap.value = 0   # normal datapath mode (Ethernet/SDRAM); SD model held in reset
 
     dut.rst_n.value = 0
     for _ in range(20):
@@ -277,6 +279,7 @@ async def test_sdram_over_udp(dut):
     log = dut._log
     log.setLevel(logging.INFO)
     phy = RmiiPhy(dut.txd, dut.tx_en, dut.clk, dut.rxd, dut.rx_er, dut.crs_dv)
+    dut.mode_strap.value = 0   # normal datapath mode (Ethernet/SDRAM); SD model held in reset
 
     dut.rst_n.value = 0
     for _ in range(20):
@@ -310,6 +313,42 @@ async def test_sdram_over_udp(dut):
     log.info("PASS: external SDRAM write + read-back over Ethernet (%d bytes)", rlen)
 
 
+@cocotb.test(skip=bool(gl))   # GL netlist is SIMULATE=0 (~84 ms power-up settle) -> impractical at gates; RTL-only
+async def test_sd_file_to_led(dut):
+    """SD-card mode (mode_strap=1): the WangXuan95 sd_fake model + FAT32 ROM image sit on the muxed SD
+    pads. The on-chip reader powers up the card, mounts FAT32, finds example.txt, and presents its
+    first two bytes 'H','e' = 0x4865 on the LEDs (sd_led_obs = {bidir[19:8], bidir[7:4]}). This is the
+    chip's SIMULATE=0 reader, so the card power-up/init is the full (slow) sequence."""
+    log = dut._log
+    log.setLevel(logging.INFO)
+
+    # RmiiPhy here only drives the 50 MHz clk onto dut.clk (RX/TX unused in SD mode; the mode mux
+    # forces card-detect present and ignores crs_dv).
+    phy = RmiiPhy(dut.txd, dut.tx_en, dut.clk, dut.rxd, dut.rx_er, dut.crs_dv)
+    dut.mode_strap.value = 1   # SD-card mode
+    dut.rst_n.value = 0
+    for _ in range(20):
+        await RisingEdge(dut.clk)
+    dut.rst_n.value = 1
+
+    EXPECTED = 0x4865   # 'H','e' -- head of example.txt ("Hello world!")
+    log.info("SD: waiting for card power-up + FAT32 mount + 2-byte file read (SIMULATE=0, slow)...")
+    found = False
+    for i in range(120000):            # poll up to ~120 ms of sim (SIMULATE=0 init is long)
+        await Timer(1, "us")
+        try:
+            led = int(dut.sd_led_obs.value)
+        except ValueError:
+            continue                   # X during init -> keep waiting
+        if led == EXPECTED:
+            found = True
+            log.info("PASS: SD read example.txt head -> sd_led=0x%04x ('H','e') at %d us", led, i)
+            break
+        if i % 10000 == 0 and i:
+            log.info("  ... %d us, sd_led_obs=%s", i, dut.sd_led_obs.value)
+    assert found, f"SD did not present 0x4865 on the LEDs (last sd_led_obs={dut.sd_led_obs.value})"
+
+
 # ---------------------------------------------------------------------------
 # runner
 # ---------------------------------------------------------------------------
@@ -322,8 +361,10 @@ def chip_top_runner():
     # Behavioural SDRAM model on the SDRAM pads -- a testbench component (not part of the DUT), so it
     # belongs in BOTH RTL and gate-level builds (GLS must cover the eth->AXI->SDRAM datapath too).
     sources.append(PROJ / "models/sdram_sim.v")
+    # WangXuan95 SD-card model on the muxed SD pads (test_sd / SD mode); also a TB component, RTL+GL.
+    sources.append(PROJ / "../third_party/wangxuan95_sdcard/SIM/sd_fake.v")
     defines = {f"SLOT_{slot.upper()}": True}
-    includes = [PROJ / "../src/"]
+    includes = [PROJ / "../src/", PROJ / "models"]   # models/ holds sd_rom_image.vh (`include in tb_top)
 
     defines[f"PDK_{pdk.replace('-', '_')}"] = True
     defines[f"SCL_{scl}"] = True
@@ -337,6 +378,9 @@ def chip_top_runner():
         sources.append(PROJ / "../final/pnl/chip_top.pnl.v")
         defines.update({"FUNCTIONAL": True, "USE_POWER_PINS": True})
     else:
+        # RTL only: skip the SD card's ~84 ms silicon power-up settle so test_sd runs in sim time.
+        # (Sim-only; tapeout/GL netlist is SIMULATE=0. Harmless to the other tests -- SD is in reset.)
+        defines["SDCARD_SIM_FAST"] = True
         sources.append(PROJ / "../src/chip_top.sv")
         sources.append(PROJ / "../src/chip_core.sv")
         # Ethernet datapath

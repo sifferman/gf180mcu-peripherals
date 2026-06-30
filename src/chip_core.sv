@@ -406,7 +406,16 @@ adpll_array #(
 wire        sd_mode = input_in[4];
 wire        sd_sck, sd_cmd_o, sd_cmd_oe, sd_reset;
 wire [15:0] sd_led;
-sdcard_file_to_led #(.SIMULATE(0), .CLK_DIV(3'd2)) i_sdcard (
+// SIMULATE=0 (silicon, default): the reader waits the full SD card power-up settle (~2^22 clk ~ 84 ms
+// @50 MHz) + slow init. That is correct for hardware but makes full-chip sim impractically long, so a
+// SIM build may define SDCARD_SIM_FAST to skip the settle (sim-only; the synthesized SD logic is
+// otherwise identical). Tapeout hardens WITHOUT the define -> SIMULATE=0.
+`ifdef SDCARD_SIM_FAST
+localparam SD_SIMULATE = 1;
+`else
+localparam SD_SIMULATE = 0;
+`endif
+sdcard_file_to_led #(.SIMULATE(SD_SIMULATE), .CLK_DIV(3'd2)) i_sdcard (
     .clk_i     (clk),
     .rstn_i    (rst_n),
     .sd_reset_o(sd_reset),

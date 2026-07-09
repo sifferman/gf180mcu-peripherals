@@ -15,9 +15,10 @@ meta:
     #KLayout.Antenna: null
     #Checker.KLayoutAntenna: null
 
-    # Disable KLayout density check
-    #KLayout.Density: null
-    #Checker.KLayoutDensity: null
+    # Disable KLayout density check (Metal2 >30% coverage is met by dummy fill
+    # added in the wafer.space precheck, not in this flow).
+    KLayout.Density: null
+    Checker.KLayoutDensity: null
 
     # Save time during development
     # Enable for sign-off
@@ -30,12 +31,126 @@ meta:
 
 DESIGN_NAME: chip_top
 VERILOG_FILES:
-- dir::../src/chip_top.sv
+# Ethernet UDP->memory datapath
+- dir::../src/eth/delay_to_negedge.sv
+- dir::../src/eth/m_axil_readwrite.sv
+- dir::../src/eth/udp_command_memory_bridge.sv
+- dir::../src/eth/alexforencich_udp_memory_server.sv
+# verilog-ethernet RMII MAC + UDP stack (only modules reachable from chip_top)
+- dir::../third_party/alexforencich_ethernet/lib/axis/rtl/arbiter.v
+- dir::../third_party/alexforencich_ethernet/lib/axis/rtl/axis_adapter.v
+- dir::../third_party/alexforencich_ethernet/lib/axis/rtl/axis_async_fifo.v
+- dir::../third_party/alexforencich_ethernet/lib/axis/rtl/axis_async_fifo_adapter.v
+- dir::../third_party/alexforencich_ethernet/lib/axis/rtl/axis_fifo.v
+- dir::../third_party/alexforencich_ethernet/lib/axis/rtl/priority_encoder.v
+- dir::../third_party/alexforencich_ethernet/rtl/arp.v
+- dir::../third_party/alexforencich_ethernet/rtl/arp_cache.v
+- dir::../third_party/alexforencich_ethernet/rtl/arp_eth_rx.v
+- dir::../third_party/alexforencich_ethernet/rtl/arp_eth_tx.v
+- dir::../third_party/alexforencich_ethernet/rtl/axis_gmii_rx.v
+- dir::../third_party/alexforencich_ethernet/rtl/axis_gmii_tx.v
+- dir::../third_party/alexforencich_ethernet/rtl/eth_arb_mux.v
+- dir::../third_party/alexforencich_ethernet/rtl/eth_axis_rx.v
+- dir::../third_party/alexforencich_ethernet/rtl/eth_axis_tx.v
+- dir::../third_party/alexforencich_ethernet/rtl/eth_mac_1g.v
+- dir::../third_party/alexforencich_ethernet/rtl/eth_mac_rmii.v
+- dir::../third_party/alexforencich_ethernet/rtl/eth_mac_rmii_fifo.v
+- dir::../third_party/alexforencich_ethernet/rtl/ip.v
+- dir::../third_party/alexforencich_ethernet/rtl/ip_arb_mux.v
+- dir::../third_party/alexforencich_ethernet/rtl/ip_complete.v
+- dir::../third_party/alexforencich_ethernet/rtl/ip_eth_rx.v
+- dir::../third_party/alexforencich_ethernet/rtl/ip_eth_tx.v
+- dir::../third_party/alexforencich_ethernet/rtl/lfsr.v
+- dir::../third_party/alexforencich_ethernet/rtl/mac_ctrl_rx.v
+- dir::../third_party/alexforencich_ethernet/rtl/mac_ctrl_tx.v
+- dir::../third_party/alexforencich_ethernet/rtl/mac_pause_ctrl_rx.v
+- dir::../third_party/alexforencich_ethernet/rtl/mac_pause_ctrl_tx.v
+- dir::../third_party/alexforencich_ethernet/rtl/rmii_phy_if.v
+- dir::../third_party/alexforencich_ethernet/rtl/udp.v
+- dir::../third_party/alexforencich_ethernet/rtl/udp_checksum_gen.v
+- dir::../third_party/alexforencich_ethernet/rtl/udp_complete.v
+- dir::../third_party/alexforencich_ethernet/rtl/udp_ip_rx.v
+- dir::../third_party/alexforencich_ethernet/rtl/udp_ip_tx.v
+# AXI fabric + on-chip memory
+- dir::../src/axi/axil_ram.sv
+- dir::../src/axi/axil_to_axi4.sv
+- dir::../src/axi/axil_interconnect.sv
+# SDRAM controller (ultraembedded) + wrapper
+- dir::../third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi.v
+- dir::../third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi_core.v
+- dir::../third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi_pmem.v
+- dir::../src/sdram/sdram_wrap.sv
+# ADPLL: generic building blocks from the third_party/adpll submodule (frequency detector,
+# loop filters, freq counter, lock detector, DCOs + the PDK cell shim), plus this project's
+# integration in src/ (the 12 fixed loop-filter x DCO configs, the array, and its CSR). The 12
+# configs are all frequency-locked, so the phase detector / TDC are not built in. The ring DCOs'
+# synthesis path instantiates the rtl/tech_cells/ primitives (gf180 cells, (* keep *)/(* dont_touch *)),
+# so those are listed too. Observe-only.
+- dir::../third_party/adpll/rtl/tech_cells/adpll_cell_nand2.sv
+- dir::../third_party/adpll/rtl/tech_cells/adpll_cell_inv.sv
+- dir::../third_party/adpll/rtl/tech_cells/adpll_cell_mux2.sv
+- dir::../third_party/adpll/rtl/tech_cells/adpll_cell_delay.sv
+- dir::../third_party/adpll/rtl/adpll_freq_counter.sv
+- dir::../third_party/adpll/rtl/adpll_freq_detector.sv
+- dir::../third_party/adpll/rtl/adpll_lock_detector.sv
+- dir::../third_party/adpll/rtl/adpll_phase_detector.sv
+- dir::../third_party/adpll/rtl/loop_filter/adpll_loop_filter_bangbang.sv
+- dir::../third_party/adpll/rtl/loop_filter/adpll_loop_filter_proportionalintegral.sv
+- dir::../third_party/adpll/rtl/loop_filter/adpll_loop_filter_gearshift.sv
+- dir::../third_party/adpll/rtl/dco/ring_dco_binary.sv
+- dir::../third_party/adpll/rtl/dco/ring_dco_thermometer.sv
+- dir::../third_party/adpll/rtl/dco/ring_dco_muxtap.sv
+- dir::../third_party/adpll/rtl/dco/ring_dco_coarsefine.sv
+- dir::../third_party/adpll/rtl/tdc/adpll_tdc_flash.sv
+- dir::../third_party/adpll/rtl/adpll_post_divider.sv
+# phase-domain ADPLL configs (TDC + phase detector + PI); instantiated by adpll_config in phase mode
+- dir::../third_party/adpll/rtl/adpll/adpll_phase_proportionalintegral_binary.sv
+- dir::../third_party/adpll/rtl/adpll/adpll_phase_proportionalintegral_thermometer.sv
+- dir::../third_party/adpll/rtl/adpll/adpll_phase_proportionalintegral_muxtap.sv
+# project-specific integration: one parameterized adpll_config (filter+DCO+gains by parameter),
+# stamped out by adpll_array into many genuinely-distinct PLLs, all behind one NumPll-generic CSR.
+- dir::../src/adpll/adpll_config.sv
+- dir::../src/adpll/adpll_array_csr.sv
+- dir::../src/adpll/adpll_array.sv
+# SD-card file-to-LED (WangXuan95 GPLv3 reader, vendored into src/sdcard/ with the inout CMD line
+# split into out/oe/in so it maps to the gf180 bidir pad). Shares the datapath pads via mode_strap.
+- dir::../src/sdcard/sdcmd_ctrl.sv
+- dir::../src/sdcard/sd_reader.sv
+- dir::../src/sdcard/sd_file_reader.sv
+- dir::../src/sdcard/sdcard_file_to_led.v
+# Top + core
 - dir::../src/chip_core.sv
+- dir::../src/chip_top.sv
 
-# Enable plugin for better SystemVerilog support
-# USE_SLANG: True
-# SLANG_ARGUMENTS: ['--keep-hierarchy']
+# Use the slang frontend. Required here: yosys's default Verilog frontend is
+# pathologically slow deriving verilog-ethernet's parameterized CRC `lfsr`
+# (constexpr lfsr_mask, >60s PER instance, regardless of LOOP/REDUCTION style),
+# which stalls JsonHeader/Synthesis indefinitely. slang elaborates the whole
+# design in ~20s.
+USE_SLANG: True
+# Two slang options:
+#   --ignore-unknown-modules : IO pad / SRAM / wafer-IP cells are physical macros
+#     (blackboxes from lib/lef), not in VERILOG_FILES; treat unknown instances as
+#     blackboxes.
+#   --max-constexpr-steps    : yosys-slang reuses one slang EvalContext for the whole
+#     design, so slang's per-evaluation `steps` counter ACCUMULATES across every
+#     constexpr (notably verilog-ethernet's CRC `lfsr_mask`, evaluated once per output
+#     bit per instance). Once the running total passes the 1,000,000 default, slang
+#     crashes (asserts on an empty SourceLocation) instead of erroring cleanly. Raising
+#     the ceiling lets the *real* CRC hash elaborate — no RTL workaround, submodule stays
+#     pristine. STILL REQUIRED even with the bumped yosys-slang (flake pins povik master):
+#     its static-select fast-paths cut per-eval cost, but the full chip_top accumulates
+#     enough constexpr work across the whole eth+sdram stack to still exceed the default
+#     without this flag (verified — it crashes). The proper fix is the per-evaluation
+#     step-counter reset on sifferman/yosys-slang@fix-evalcontext-step-accumulation, which
+#     removes the need for this flag once merged upstream. (Root-caused in questions.md.)
+SLANG_ARGUMENTS: ['--ignore-unknown-modules', '--max-constexpr-steps', '1000000000']
+# The verilog-ethernet stack trips yosys's synth check with benign warnings that are
+# FPGA-proven and pass RTL sim: ~192 "no driver" on unused PTP timestamp ports
+# (rx/tx_ptp_ts; PTP disabled) and ~86 yosys false-positive "multiple drivers" on the
+# async-FIFO gray2bin combinational function. Don't fail the flow on them (correctness
+# gates here are RTL sim + LVS). Re-review when adding new RTL.
+ERROR_ON_SYNTH_CHECKS: false
 
 # Slightly smaller file sizes
 PRIMARY_GDSII_STREAMOUT_TOOL: klayout
@@ -61,16 +176,68 @@ IGNORE_DISCONNECTED_MODULES:
 - gf180mcu_ws_ip__logo
 - gf180mcu_ws_ip__marker
 
+# LVS: topological (cell-level) comparison
+NETGEN_SETUP: dir::netgen_topological_setup.tcl
+
+# --- Hold-repair budget (close the SDRAM source-synchronous output hold) ---
+# The SDRAM DQ/ctrl outputs (bidir_PAD[12..25]) are launched on clk_PAD but captured by the SDRAM on
+# the forwarded sdram_clk_out; the small launch-vs-forward skew leaves ~0.3-0.5 ns of write-data hold
+# at the fast corners. reg-to-reg hold is already clean; only these I/O paths need extra delay. The
+# default hold-repair (50% buffer budget) inserted 34k hold buffers then hit RSZ-0064 (gave up) with
+# ~54 left. Raise the budget so the resizer can finish delaying the SDRAM output paths.
+PL_RESIZER_HOLD_MAX_BUFFER_PCT: 75
+GRT_RESIZER_HOLD_MAX_BUFFER_PCT: 75
+
 # Clock
 CLOCK_PORT: clk_PAD
 CLOCK_NET: clk_pad/Y
-CLOCK_PERIOD: 40 # 25 MHz
+CLOCK_PERIOD: 20 # 50 MHz (experiment; was 40 = 25 MHz)
+
+# --- Delay-driven synthesis (attack ADPLL loop-filter logic DEPTH, not via multicycle) ---
+# The residual SS setup violator is the ADPLL PI loop-filter accumulator: a wide add/multiply that
+# the default "AREA 0" strategy (abc `amap`) maps as a ~40-level RIPPLE-CARRY chain (~18 ns of pure
+# cell delay -> fails the 20 ns period at the 125C/3v00 corner). This is a logic-DEPTH problem, not
+# placement or constraints: SDC cannot add cycle budget, and the path is NOT cleanly multicycle (the
+# freq-detector window is runtime-programmable to 1), so we do NOT false-path/multicycle it. Instead
+# flip abc to a DELAY strategy: `&dch` (don't-care logic restructuring) + `&nf` (delay-driven mapper)
+# + `retime` re-map the SAME RTL into a shallow parallel-prefix-style adder (~log2 depth), shrinking
+# the loop's combinational delay directly. RESYNTH does a second timing-driven restructuring pass in
+# PnR on whatever critical paths remain. No RTL change, no constraint relabeling.
+SYNTH_STRATEGY: "DELAY 0"
+
+# ADPLL ring-DCO nets: keep the resizer's hands off the oscillator. Resizer::dontTouch(net) only
+# returns true when the NET itself is do-not-touch -- the (* dont_touch *) on the inv/mux CELLS does
+# NOT propagate to the nets between them (OpenROAD rsz/Resizer.cc), so without this repair_design can
+# splice a buffer into the ring and change/ruin the oscillation. This regex marks every ring net
+# (861 of them, verified on the routed netlist) do-not-touch so no buffer is inserted between the
+# dont_touch inverters. (Forced *adjacency* of the inverters is a separate concern -- OpenROAD honors
+# dbGroup placement fences but LibreLane exposes no knob for it; the robust answer is hardening each
+# DCO as a macro. Here, connectivity-driven global placement keeps the chain compact enough.)
+#
+# DISABLED ("^$" = match nothing): net-level dont_touch on the oscillator nets makes repair_design
+# ERROR (RSZ-3006 "Failed to insert buffer ... is dont_touch") -- the ring/TDC OUTPUT node is high
+# fanout (feedback + TDC dco_clk_i + freq counter) and legitimately needs buffering for max-cap/
+# transition, which dont_touch forbids. The cells stay protected by the RTL (* dont_touch *) (not
+# resized/removed) and the SDC false-paths keep these chains out of timing; repair_design is allowed
+# to buffer the high-fanout distribution net. To get a TRULY buffer-free oscillator loop (so the
+# inverter-to-inverter nets can be dont_touch without the RSZ-3006), the right fix is an RTL change:
+# add a (* dont_touch *) output buffer in ring_dco/adpll_tdc_flash that decouples the low-fanout
+# feedback loop from the bufferable distribution output. Tracked as follow-up.
+RSZ_DONT_TOUCH_RX: "^$"
+
+# CTS sink clustering. The 12-PLL array adds thousands of reference-domain flops, so the core
+# clock tree is large; OpenROAD's default sink clustering (~20 sinks per leaf buffer) drives each
+# clkbuf_leaf well past the tight MAX_FANOUT_CONSTRAINT of 9, which flagged ~2000 benign clock-tree
+# leaf max-fanout warnings (the data enable/reset nets meet 9 — repair_design buffers them). Cap
+# the leaf cluster at 8 sinks so the clock tree honours the same fanout budget as the data nets
+# (more, smaller clock buffers; the die has room at ~51% utilization).
+CTS_SINK_CLUSTERING_SIZE: 8
 
 # Overfix hold violations
 PL_RESIZER_HOLD_SLACK_MARGIN: 0.35
 GRT_RESIZER_HOLD_SLACK_MARGIN: 0.3
 
-# Increase density for more 
+# Increase density for more
 # logic on your die
 PL_TARGET_DENSITY_PCT: 35
 GRT_ALLOW_CONGESTION: true
@@ -78,6 +245,15 @@ GRT_ALLOW_CONGESTION: true
 # Allow a larger Y displacement
 PL_MAX_DISPLACEMENT_Y: 200
 
+# Antenna handling. The GRT-based OpenROAD.RepairAntennas (pre-route diode insertion) deterministically
+# hits an OpenROAD global-router bug on this netlist -- "[GRT-0183] Net _001309_: heap underflow during
+# 3D maze routing" -- so disable it and instead mitigate antennas with (a) the non-GRT heuristic diode
+# insertion (Odb.HeuristicDiodeInsertion: pre-insert a diode on any net longer than the threshold) and
+# (b) the detailed router's own antenna repair pass (DRT, below). The final magic/klayout antenna check
+# still validates the result. (RepairAntennas was only triggered for routes the DRT pass already covers.)
+RUN_ANTENNA_REPAIR: false
+RUN_HEURISTIC_DIODE_INSERTION: true
+HEURISTIC_ANTENNA_THRESHOLD: 90  # µm: insert a protective diode on nets longer than this
 # Fix antenna violations after DRT
 DRT_ANTENNA_REPAIR_ITERS: 10
 DRT_ANTENNA_REPAIR_MARGIN: 10 # %

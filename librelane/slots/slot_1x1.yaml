@@ -87,17 +87,17 @@ PAD_WEST: [
     "vdd_pads\\[1\\].pad", # core domain
     "vss_pads\\[1\\].pad", # core domain
 
-    "inputs\\[11\\].pad",
-    "inputs\\[10\\].pad",
-    "inputs\\[9\\].pad",
-    "inputs\\[8\\].pad",
-    "inputs\\[7\\].pad",
-    "inputs\\[6\\].pad",
+    "bidir\\[46\\].pad",
+    "bidir\\[45\\].pad",
+    "bidir\\[44\\].pad",
+    "bidir\\[43\\].pad",
+    "bidir\\[42\\].pad",
+    "bidir\\[41\\].pad",
 
     "dvdd_pads\\[4\\].pad", # I/O domain
     "dvss_pads\\[6\\].pad", # I/O domain
 
-    "inputs\\[5\\].pad",
+    "bidir\\[40\\].pad",
     "inputs\\[4\\].pad",
     "inputs\\[3\\].pad",
     "inputs\\[2\\].pad",

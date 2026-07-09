@@ -68,7 +68,7 @@ module tb_top (
     // external SDRAM (0x1000_0000) over Ethernet. Pad map matches src/chip_core.sv: DQ[23:8],
     // clk[24], cke[25], cs[26], ras[27], cas[28], we[29], dqm[31:30], addr[44:32], ba[46:45].
 `ifndef GL
-    sdram_sim sdram_model (
+    sdram_model sdram_model (
         .Clk  (bidir_PAD[24]),
         .Cke  (bidir_PAD[25]),
         .Cs_n (bidir_PAD[26]),

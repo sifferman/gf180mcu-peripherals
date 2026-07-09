@@ -360,7 +360,7 @@ def chip_top_runner():
     sources = [PROJ / "tb_top.sv"]
     # Behavioural SDRAM model on the SDRAM pads -- a testbench component (not part of the DUT), so it
     # belongs in BOTH RTL and gate-level builds (GLS must cover the eth->AXI->SDRAM datapath too).
-    sources.append(PROJ / "models/sdram_sim.v")
+    sources.append(PROJ / "sdram/sdram_model.v")
     # WangXuan95 SD-card model on the muxed SD pads (test_sd / SD mode); also a TB component, RTL+GL.
     sources.append(PROJ / "../third_party/wangxuan95_sdcard/SIM/sd_fake.v")
     defines = {f"SLOT_{slot.upper()}": True}

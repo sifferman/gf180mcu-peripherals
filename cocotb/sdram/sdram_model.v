@@ -12,7 +12,7 @@
 
 `default_nettype none
 
-module sdram_sim #(
+module sdram_model #(
     parameter ROW_W = 13,
     parameter COL_W = 9,
     parameter CAS   = 2,

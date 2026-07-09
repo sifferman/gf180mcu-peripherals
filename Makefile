@@ -1,11 +1,12 @@
 MAKEFILE_DIR := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
+SHELL := /bin/bash
 
 RUN_TAG = $(shell ls librelane/runs/ | tail -n 1)
 TOP = chip_top
 
 PDK_ROOT ?= $(MAKEFILE_DIR)/gf180mcu
 PDK ?= gf180mcuD
-PDK_COMMIT ?= 019cf7a3e0de79bb0e4b6213758882d283c65816
+PDK_COMMIT ?= 140b0494c6665b10ce9353cb1c2ef5bcc18e7d66
 
 # Available SCL libraries:
 # gf180mcu_as_sc_mcu7t3v3
@@ -15,27 +16,27 @@ PDK_COMMIT ?= 019cf7a3e0de79bb0e4b6213758882d283c65816
 # gf180mcu_osu_sc_gp12t3v3 (broken)
 
 ifeq ($(SCL),default)
-    SCL = gf180mcu_fd_sc_mcu7t5v0
+    SCL = gf180mcu_as_sc_mcu7t3v3
 endif
-SCL ?= gf180mcu_fd_sc_mcu7t5v0
+SCL ?= gf180mcu_as_sc_mcu7t3v3
 
 # Available PAD libraries:
 # gf180mcu_fd_io
 # gf180mcu_ocd_io
 
 ifeq ($(PAD),default)
-    PAD = gf180mcu_fd_io
+    PAD = gf180mcu_ocd_io
 endif
-PAD ?= gf180mcu_fd_io
+PAD ?= gf180mcu_ocd_io
 
 # Available SRAM macros:
 # gf180mcu_fd_ip_sram
 # gf180mcu_ocd_ip_sram
 
 ifeq ($(SRAM),default)
-    SRAM = gf180mcu_fd_ip_sram
+    SRAM = gf180mcu_ocd_ip_sram
 endif
-SRAM ?= gf180mcu_fd_ip_sram
+SRAM ?= gf180mcu_ocd_ip_sram
 
 ifeq ($(SRAM),gf180mcu_fd_ip_sram)
     MACROS = 5v
@@ -133,3 +134,58 @@ sim-gl: clone-pdk defines ## Run gate-level simulation with cocotb (after copy-f
 sim-view: ## View simulation waveforms in GTKWave
 	gtkwave cocotb/sim_build/chip_top.fst
 .PHONY: sim-view
+
+sim-sdram: ## Standalone SDRAM controller + open behavioral model test (iverilog, no PDK)
+	mkdir -p cocotb/sim_build
+	iverilog -g2012 -o cocotb/sim_build/tb_sdram \
+		cocotb/models/tb_sdram.v \
+		third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi.v \
+		third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi_core.v \
+		third_party/ultraembedded_axi_sdram_controller/src_v/sdram_axi_pmem.v \
+		cocotb/models/sdram_sim.v
+	vvp cocotb/sim_build/tb_sdram
+.PHONY: sim-sdram
+
+sim-bridge: clone-pdk defines ## Bridge a UDP socket to the sim so dma.py drives the simulated chip
+	cd cocotb; TEST_MODULE=sim_udp_bridge PDK_ROOT=${PDK_ROOT} PDK=${PDK} SLOT=${SLOT} PAD=${PAD} SCL=${SCL} SRAM=${SRAM} python3 chip_top_tb.py
+.PHONY: sim-bridge
+
+# ---- ADPLL ----
+# Generic PLL IP (building blocks + their sims) lives in the third_party/adpll submodule; delegate
+# those IP sims there. The 12-PLL array (this project's integration) is built here from src/.
+ADPLL_IP    = third_party/adpll/rtl
+.PHONY: sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr
+sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr: ## ADPLL IP sims (delegated to third_party/adpll)
+	$(MAKE) -C third_party/adpll $@
+
+sim-adpll-array: ## CSR framework: program every distinct PLL over AXI4-Lite, poll each for lock, test obs mux
+	@mkdir -p cocotb/sim_build
+	iverilog -g2012 -c <(printf '+timescale+1ns/1ps\n') -o cocotb/sim_build/tb_adpll_array \
+		src/adpll/adpll_array_csr.sv src/adpll/adpll_array.sv src/adpll/adpll_config.sv \
+		$(ADPLL_IP)/loop_filter/adpll_loop_filter_bangbang.sv \
+		$(ADPLL_IP)/loop_filter/adpll_loop_filter_proportionalintegral.sv \
+		$(ADPLL_IP)/loop_filter/adpll_loop_filter_gearshift.sv \
+		$(ADPLL_IP)/adpll_freq_detector.sv $(ADPLL_IP)/adpll_freq_counter.sv $(ADPLL_IP)/adpll_lock_detector.sv \
+		$(ADPLL_IP)/adpll_post_divider.sv \
+		$(ADPLL_IP)/adpll_phase_detector.sv \
+		$(ADPLL_IP)/adpll/adpll_phase_proportionalintegral_thermometer.sv \
+		$(ADPLL_IP)/adpll/adpll_phase_proportionalintegral_muxtap.sv \
+		$(ADPLL_IP)/adpll/adpll_phase_proportionalintegral_binary.sv \
+		third_party/adpll/sim/adpll_tdc_behavioral.sv \
+		third_party/adpll/sim/ring_dco_behavioral.sv \
+		cocotb/models/tb_adpll_array.v
+	vvp cocotb/sim_build/tb_adpll_array | grep -E "programmed|LOCKED|PASS|FAIL|obs mux"
+.PHONY: sim-adpll-array
+
+# DCO SPICE characterization (freq-vs-code, PVT corners) is being moved to OpenROAD/Magic
+# parasitic extraction from the hardened ring_dco macros (single source of truth = the .sv),
+# replacing the former hand-written schematic-netlist generator. No make target yet.
+
+sim-sdcard: ## SD-card file-to-LED block test: split-IO reader + sd_fake model + FAT32 image -> LEDs
+	@mkdir -p cocotb/sim_build
+	iverilog -g2012 -I cocotb/models -o cocotb/sim_build/tb_sdcard \
+		cocotb/models/tb_sdcard.v \
+		src/sdcard/sdcard_file_to_led.v src/sdcard/sd_file_reader.sv src/sdcard/sd_reader.sv \
+		src/sdcard/sdcmd_ctrl.sv third_party/wangxuan95_sdcard/SIM/sd_fake.v
+	vvp cocotb/sim_build/tb_sdcard | grep -E "PASS|FAIL|waiting"
+.PHONY: sim-sdcard

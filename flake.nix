@@ -33,6 +33,19 @@
           overlays = [
             nix-eda.overlays.default
             devshell.overlays.default
+            # Bump yosys-slang past the pinned 35de0406 to upstream master, which fixes the
+            # crash on verilog-ethernet's wide CRC `lfsr` (the static-select fast-path commits
+            # 2d4b055/7332909 cut constexpr step cost so the per-eval budget no longer
+            # accumulates past the limit). Lets the design elaborate with the real CRC hash
+            # without the --max-constexpr-steps workaround. Placed before librelane's overlay
+            # so its bundled yosys-with-plugins (default.nix yosys-plugin-set) picks it up.
+            (final: prev: {
+              yosys-slang = prev.yosys-slang.override {
+                rev = "b2b718c5a66ad525858298466f7ecaa60497393e"; # povik/yosys-slang master, 2026-06-21
+                rev-date = "2026-06-21";
+                hash = "sha256-EGdgyrKXanbSyidhKnhLX+PRmewfPmjDTVvodGiNENU=";
+              };
+            })
             librelane.overlays.default
           ];
         }
@@ -59,6 +72,11 @@
               # Simulation
               iverilog
               verilator
+
+              # SPICE (ngspice 46 from nix-eda; >=42 is required for the gf180 BSIM4
+              # models — the host's ngspice-34 rejects params like mulu0). Used by
+              # `make dco-spice` for the ring-DCO frequency-vs-code characterization.
+              ngspice
 
               # Waveform viewing
               gtkwave

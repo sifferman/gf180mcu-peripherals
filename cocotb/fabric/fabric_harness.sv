@@ -1,27 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
-// Standalone test of the M2 on-chip fabric: AXI4-Lite master -> axil_interconnect
-// -> { axil_ram (slave0, low region), sdram_wrap->sdram_axi->sdram_sim (slave1, high) }.
-// Verifies address decode + the AXI4-Lite<->AXI4 adapter + SDRAM path.
-//   iverilog -g2012 -o /tmp/tbm2 cocotb/models/tb_m2_fabric.v \
-//     src/axi/axil_ram.sv src/axi/axil_to_axi4.sv src/axi/axil_interconnect.sv \
-//     src/sdram/sdram_wrap.sv third_party/ultraembedded_axi_sdram_controller/src_v/*.v \
-//     cocotb/models/sdram_sim.v && vvp /tmp/tbm2
-
+// cocotb HDL harness for the M2 on-chip fabric:
+//   AXI4-Lite master -> axil_interconnect -> { axil_ram (slave0, low), sdram_wrap
+//   -> sdram_axi -> sdram_model (slave1, high) }.
+// The upstream AXI4-Lite master port + clk/rst_n are exposed for fabric_tb.py.
 `default_nettype none
 `timescale 1ns/1ps
 
-module tb_m2_fabric;
-    reg clk = 0, rst_n = 0;
-    always #10 clk = ~clk;            // 50 MHz
-    wire rst = ~rst_n;
-
-    // upstream AXI4-Lite master signals
-    reg [31:0] awaddr=0; reg awvalid=0; wire awready;
-    reg [31:0] wdata=0;  reg [3:0] wstrb=0; reg wvalid=0; wire wready;
-    wire [1:0] bresp; wire bvalid; reg bready=0;
-    reg [31:0] araddr=0; reg arvalid=0; wire arready;
-    wire [31:0] rdata; wire [1:0] rresp; wire rvalid; reg rready=0;
-
+module fabric_harness (
+    input  wire        clk,
+    input  wire        rst_n,
+    input  wire [31:0] awaddr, input wire awvalid, output wire awready,
+    input  wire [31:0] wdata,  input wire [3:0] wstrb, input wire wvalid, output wire wready,
+    output wire [1:0]  bresp,  output wire bvalid, input wire bready,
+    input  wire [31:0] araddr, input wire arvalid, output wire arready,
+    output wire [31:0] rdata,  output wire [1:0] rresp, output wire rvalid, input wire rready
+);
     // interconnect <-> slaves
     wire [31:0] m0_awaddr,m0_wdata,m0_araddr,m0_rdata; wire [2:0] m0_awprot,m0_arprot;
     wire [3:0] m0_wstrb; wire [1:0] m0_bresp,m0_rresp;
@@ -73,43 +66,8 @@ module tb_m2_fabric;
         .sdram_cas_o(s_cas),.sdram_we_o(s_we),.sdram_dqm_o(s_dqm),.sdram_addr_o(s_addr),
         .sdram_ba_o(s_ba),.sdram_dq_o(dq_o),.sdram_dq_oe_o(dq_oe),.sdram_dq_i(dq_i)
     );
-    sdram_sim model (.Clk(s_clk),.Cke(s_cke),.Cs_n(s_cs),.Ras_n(s_ras),.Cas_n(s_cas),
-                     .We_n(s_we),.Ba(s_ba),.Addr(s_addr),.Dqm(s_dqm),.Dq(dq));
-
-    task wr(input [31:0] a, input [31:0] d); begin
-        @(posedge clk); awaddr<=a; awvalid<=1; wdata<=d; wstrb<=4'hf; wvalid<=1; bready<=1;
-        @(posedge clk); while(!(awready&&wready)) @(posedge clk); awvalid<=0; wvalid<=0;
-        while(!bvalid) @(posedge clk); @(posedge clk); bready<=0;
-    end endtask
-    task rd(input [31:0] a, output [31:0] d); begin
-        @(posedge clk); araddr<=a; arvalid<=1; rready<=1;
-        @(posedge clk); while(!arready) @(posedge clk); arvalid<=0;
-        while(!rvalid) @(posedge clk); d=rdata; @(posedge clk); rready<=0;
-    end endtask
-
-    reg [31:0] got; integer errs=0;
-    initial begin
-        repeat(5) @(posedge clk); rst_n<=1;
-        repeat(7000) @(posedge clk);            // SDRAM init
-        // slave0 (scratch RAM, sel bit 28 = 0)
-        wr(32'h0000_0040, 32'h1234_5678);
-        rd(32'h0000_0040, got);
-        if (got!==32'h1234_5678) begin $display("FAIL SRAM @0x40: %08x",got); errs=errs+1; end
-        else $display("OK SRAM  @0x40 = %08x", got);
-        // slave1 (SDRAM, addr bit 28 = 1)
-        wr(32'h1000_0040, 32'hCAFE_BABE);
-        wr(32'h1000_0044, 32'hDEAD_BEEF);
-        rd(32'h1000_0040, got);
-        if (got!==32'hCAFE_BABE) begin $display("FAIL SDRAM @0x40: %08x",got); errs=errs+1; end
-        else $display("OK SDRAM @0x40 = %08x", got);
-        rd(32'h1000_0044, got);
-        if (got!==32'hDEAD_BEEF) begin $display("FAIL SDRAM @0x44: %08x",got); errs=errs+1; end
-        else $display("OK SDRAM @0x44 = %08x", got);
-        if (errs==0) $display("PASS: M2 fabric (interconnect + SRAM + SDRAM)");
-        else         $display("FAIL: %0d errors", errs);
-        $finish;
-    end
-    initial begin #3_000_000; $display("FAIL: timeout"); $finish; end
+    sdram_model model (.Clk(s_clk),.Cke(s_cke),.Cs_n(s_cs),.Ras_n(s_ras),.Cas_n(s_cas),
+                       .We_n(s_we),.Ba(s_ba),.Addr(s_addr),.Dqm(s_dqm),.Dq(dq));
 endmodule
 
 `default_nettype wire

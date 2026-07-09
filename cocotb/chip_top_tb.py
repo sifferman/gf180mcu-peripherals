@@ -364,7 +364,7 @@ def chip_top_runner():
     # WangXuan95 SD-card model on the muxed SD pads (test_sd / SD mode); also a TB component, RTL+GL.
     sources.append(PROJ / "../third_party/wangxuan95_sdcard/SIM/sd_fake.v")
     defines = {f"SLOT_{slot.upper()}": True}
-    includes = [PROJ / "../src/", PROJ / "models"]   # models/ holds sd_rom_image.vh (`include in tb_top)
+    includes = [PROJ / "../src/", PROJ / "sdcard"]   # sdcard/ holds sd_rom_image.vh (`include in tb_top)
 
     defines[f"PDK_{pdk.replace('-', '_')}"] = True
     defines[f"SCL_{scl}"] = True

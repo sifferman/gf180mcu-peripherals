@@ -3,10 +3,10 @@
 #
 # cocotb testbench for the chip's Ethernet UDP -> memory gold path (M1).
 #
-# Drives chip_top's RMII pins (broken out by cocotb/tb_top.sv) with a vendored,
-# dependency-free subset of cocotbext-eth (cocotb/_eth) and exercises the real
-# wire protocol over hand-built Ethernet frames (pure struct, no scapy / no
-# cocotbext-axi), so it runs in CI with only `cocotb`:
+# Drives chip_top's RMII pins (broken out by cocotb/tb_top.sv) with the RMII PHY
+# models from the cocotbext-eth submodule and exercises the real wire protocol
+# over hand-built Ethernet frames (pure struct, no scapy / no cocotbext-axi), so
+# it runs in CI with only `cocotb`:
 #
 #   * ARP   - host asks "who has 192.168.1.128?", expects the chip's MAC.
 #   * WRITE - UDP command writes bytes into the on-chip RAM; expects an ack.
@@ -23,8 +23,8 @@ import cocotb
 from cocotb.triggers import RisingEdge, Timer, with_timeout
 
 PROJ = Path(__file__).resolve().parent
-sys.path.insert(0, str(PROJ))            # for the vendored _eth package
-from _eth import RmiiPhy, GmiiFrame       # noqa: E402
+sys.path.insert(0, str(PROJ.parent / "third_party" / "cocotbext-eth"))  # cocotbext-eth submodule (PHY models)
+from cocotbext.eth import RmiiPhy, GmiiFrame  # noqa: E402
 
 # ---- environment / config ----
 sim = os.getenv("SIM", "icarus")

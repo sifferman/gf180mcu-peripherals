@@ -26,7 +26,8 @@ from cocotb.triggers import RisingEdge, Timer, with_timeout
 
 PROJ = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJ))
-from _eth import RmiiPhy, GmiiFrame  # noqa: E402
+sys.path.insert(0, str(PROJ.parent / "third_party" / "cocotbext-eth"))  # cocotbext-eth submodule (PHY models)
+from cocotbext.eth import RmiiPhy, GmiiFrame  # noqa: E402
 # Reuse the wire-format helpers from the main testbench.
 from chip_top_tb import (  # noqa: E402
     eth, arp, udp_frame, parse_udp, FPGA_MAC, FPGA_IP, HOST_MAC, HOST_IP, UDP_PORT,

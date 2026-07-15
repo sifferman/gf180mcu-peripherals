@@ -8,3 +8,7 @@ img/
 *.lyrdb
 generated_defines.svh
 .venv-sim/
+
+# wafer.space submission artifacts (large GDS + precheck log)
+signoff/waferspace-resubmit/*.gds
+waferspace.log

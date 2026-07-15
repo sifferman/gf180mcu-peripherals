@@ -15,10 +15,12 @@ meta:
     #KLayout.Antenna: null
     #Checker.KLayoutAntenna: null
 
-    # Disable KLayout density check (Metal2 >30% coverage is met by dummy fill
-    # added in the wafer.space precheck, not in this flow).
-    KLayout.Density: null
-    Checker.KLayoutDensity: null
+    # KLayout density check is ENABLED: the custom filler (KLAYOUT_FILLER_SCRIPT
+    # below) now meets M2.4 (>30% Metal2), so the flow verifies density itself and
+    # catches regressions in-flow instead of at the wafer.space precheck. (Was
+    # disabled on the mistaken assumption that the precheck adds fill -- it only checks.)
+    #KLayout.Density: null
+    #Checker.KLayoutDensity: null
 
     # Save time during development
     # Enable for sign-off
@@ -318,10 +320,18 @@ MAGIC_GDS_FLATGLOB:
 - "xdec32_*"
 - "sa_*"
 
-# Since we cannot meet the minimum density limit on Metal2,
-# ignore active metal on previous and subsequent layers
-# (DM.5_DM.7 and DM.4_DM.6). Dummy metal is moved to active
-# metal during the precheck.
+# Metal2 density fix. The wafer.space precheck's KLayout density check enforces
+# M2.4 (Metal2 coverage > 30% die-wide) -- it does NOT add fill, so the submitted
+# GDS must already meet it. The stock PDK filler leaves Metal2 at 29.54% (just
+# short) and cannot pack tighter: its staggered fill lattice puts anti-diagonal
+# cells (line_spaces-0.5)*sqrt(2) apart, so DM.2b (0.98 um min dummy space) caps
+# line_spaces at ~1.193. Our fork of the fill scripts (librelane/klayout_fill/)
+# drops that shear (orthogonal lattice, min spacing == line_spaces) and uses a
+# 2.5 um cell at 1.0 um spacing, which clears M2.4 (>30%) and DM.2b together.
+# Verified on the routed layout with the PDK density + dummy_metal decks.
+KLAYOUT_FILLER_SCRIPT: dir::klayout_fill/fill_all.rb
+# Insert Metal2 dummy as active metal so the fill isn't blocked by the
+# DM.4_DM.6 / DM.5_DM.7 adjacent-layer spacing to real routing.
 KLAYOUT_FILLER_OPTIONS:
   Metal2_ignore_active: true
 
